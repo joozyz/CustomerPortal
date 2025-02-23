@@ -69,12 +69,12 @@ with app.app_context():
 
     try:
         # Import and register blueprints
-        from routes import billing
+        from routes.billing import billing
         app.register_blueprint(billing)
         logger.info("Blueprints registered successfully")
     except Exception as e:
         logger.error(f"Error registering blueprints: {str(e)}")
         raise
 
-    # Import main routes last to avoid circular imports
-    import routes
+    # Import routes after registering blueprints
+    from routes import *

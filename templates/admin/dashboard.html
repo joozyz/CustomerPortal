@@ -99,15 +99,20 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 const statusEl = document.getElementById('podman-status');
                 statusEl.style.display = 'block';
-                statusEl.className = `alert alert-${data.status === 'ok' ? 'success' : 'danger'}`;
-                statusEl.textContent = `Podman Status: ${data.message}`;
+                if (data.status === 'ok') {
+                    statusEl.className = 'alert alert-success';
+                    statusEl.textContent = `Podman Status: ${data.message}`;
+                } else {
+                    statusEl.className = 'alert alert-warning';
+                    statusEl.textContent = 'Podman is not available. Container deployments are disabled.';
+                }
             })
             .catch(error => {
                 console.error('Error checking Podman status:', error);
                 const statusEl = document.getElementById('podman-status');
                 statusEl.style.display = 'block';
-                statusEl.className = 'alert alert-danger';
-                statusEl.textContent = 'Error checking Podman status';
+                statusEl.className = 'alert alert-warning';
+                statusEl.textContent = 'Podman service is not available. Container deployments are disabled.';
             });
     }
 

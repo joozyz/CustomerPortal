@@ -7,7 +7,10 @@ class PodmanManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.client = None
-        self.connect()
+        try:
+            self.connect()
+        except Exception as e:
+            self.logger.warning(f"Podman initialization failed (this is okay if Podman is not required): {str(e)}")
 
     def connect(self) -> bool:
         """Initialize connection to Podman"""
@@ -20,14 +23,14 @@ class PodmanManager:
             self.logger.info("Successfully connected to Podman (rootless)")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to connect to Podman: {str(e)}")
+            self.logger.warning(f"Failed to connect to Podman (non-critical): {str(e)}")
             return False
 
     def check_system(self) -> Tuple[bool, str]:
         """Check Podman system status and return (is_healthy, status_message)"""
         try:
             if not self.client:
-                return False, "Podman client not initialized"
+                return False, "Podman service unavailable"
 
             # Test connection by listing images
             self.client.images.list()
@@ -38,8 +41,8 @@ class PodmanManager:
             return True, f"Podman {version['Version']} running"
         except Exception as e:
             error_msg = str(e)
-            self.logger.error(f"Podman system check failed: {error_msg}")
-            return False, f"Podman connection error: {error_msg}"
+            self.logger.warning(f"Podman system check failed (non-critical): {error_msg}")
+            return False, f"Podman service unavailable"
 
     def deploy_lemp_stack(self, service: Service, user_id: int) -> Optional[Container]:
         if not self.check_system()[0]:
