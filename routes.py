@@ -122,6 +122,12 @@ def update_service(service_id):
 def deploy_service(service_id):
     service = Service.query.get_or_404(service_id)
 
+    # Check Podman system status
+    podman_status, status_message = podman_manager.check_system()
+    if not podman_status:
+        flash(f'Cannot deploy service: {status_message}', 'danger')
+        return redirect(url_for('service_catalog'))
+
     if not service.container_image or not service.container_port:
         flash('This service does not support container deployment', 'danger')
         return redirect(url_for('service_catalog'))
@@ -211,3 +217,13 @@ def container_status(container_id):
 def index():
     services = Service.query.all()
     return render_template('index.html', services=services)
+
+@app.route('/admin/podman-status')
+@login_required
+@admin_required
+def podman_status():
+    status, message = podman_manager.check_system()
+    return jsonify({
+        'status': 'ok' if status else 'error',
+        'message': message
+    })

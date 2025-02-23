@@ -4,6 +4,7 @@
 <div class="row">
     <div class="col-md-12 mb-4">
         <h2>Admin Dashboard</h2>
+        <div id="podman-status" class="alert" style="display: none;"></div>
     </div>
 </div>
 
@@ -87,4 +88,31 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function checkPodmanStatus() {
+        fetch('/admin/podman-status')
+            .then(response => response.json())
+            .then(data => {
+                const statusEl = document.getElementById('podman-status');
+                statusEl.style.display = 'block';
+                statusEl.className = `alert alert-${data.status === 'ok' ? 'success' : 'danger'}`;
+                statusEl.textContent = `Podman Status: ${data.message}`;
+            })
+            .catch(error => {
+                console.error('Error checking Podman status:', error);
+                const statusEl = document.getElementById('podman-status');
+                statusEl.style.display = 'block';
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = 'Error checking Podman status';
+            });
+    }
+
+    checkPodmanStatus();
+    setInterval(checkPodmanStatus, 30000);
+});
+</script>
 {% endblock %}
