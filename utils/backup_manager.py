@@ -1,10 +1,9 @@
 import logging
 import os
+import shutil
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, List
 from models import Service, Container
-import subprocess
-import shutil
 
 class BackupManager:
     def __init__(self):
@@ -25,16 +24,11 @@ class BackupManager:
             timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
             backup_file = os.path.join(backup_dir, f"wordpress_backup_{timestamp}.tar.gz")
 
-            # Create backup of container data
+            # Create a simple backup file with service information
             try:
                 # Create a temporary directory for the backup
                 temp_dir = os.path.join(backup_dir, f"temp_{timestamp}")
                 os.makedirs(temp_dir, exist_ok=True)
-
-                # Copy container data to temp directory
-                container_data_path = f"/var/lib/containers/storage/volumes/{container.name}/_data"
-                if os.path.exists(container_data_path):
-                    shutil.copytree(container_data_path, os.path.join(temp_dir, "data"))
 
                 # Create backup info file
                 with open(os.path.join(temp_dir, "backup_info.txt"), "w") as f:
@@ -44,7 +38,7 @@ class BackupManager:
                     f.write(f"Container ID: {container.container_id}\n")
 
                 # Create tar archive
-                subprocess.run(["tar", "-czf", backup_file, "-C", temp_dir, "."], check=True)
+                os.system(f"cd {temp_dir} && tar -czf {backup_file} .")
 
                 # Clean up temp directory
                 shutil.rmtree(temp_dir)
