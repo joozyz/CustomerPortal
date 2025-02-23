@@ -24,12 +24,6 @@ def check_stripe_status():
         flash('Payment system is currently unavailable. Please try again later.', 'danger')
         return redirect(url_for('service.dashboard'))
 
-@billing.route('/billing/setup', methods=['GET'])
-@login_required
-def setup_billing():
-    return render_template('billing/setup.html', 
-                         stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
-
 @billing.route('/billing/create-setup-session', methods=['POST'])
 @login_required
 def create_setup_session():
