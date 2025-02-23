@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import Service, Container, Subscription
 from utils.podman import podman_manager
-from utils.backup_manager import backup_manager  # Fixed import path
+from utils.backup_manager import backup_manager
 from datetime import datetime
 import logging
 import os
@@ -276,3 +276,62 @@ def remove_container(container_id):
         flash('Failed to remove container', 'danger')
 
     return redirect(url_for('service.dashboard'))
+
+@service.route('/services/<int:service_id>/backups', methods=['GET'])
+@login_required
+def list_backups(service_id):
+    """List all backups for a service"""
+    try:
+        service = Service.query.get_or_404(service_id)
+
+        # Ensure the service belongs to the current user
+        container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=service_id
+        ).first()
+
+        if not container:
+            flash('No container found for this service', 'danger')
+            return redirect(url_for('service.dashboard'))
+
+        backups = backup_manager.list_backups(service)
+        return render_template('services/backups.html', 
+                             service=service,
+                             backups=backups)
+
+    except Exception as e:
+        logger.error(f"Error listing backups: {str(e)}")
+        flash('An error occurred while listing backups', 'danger')
+        return redirect(url_for('service.dashboard'))
+
+@service.route('/services/<int:service_id>/restore/<path:backup_file>', methods=['POST'])
+@login_required
+def restore_backup(service_id, backup_file):
+    """Restore a backup for a service"""
+    try:
+        service = Service.query.get_or_404(service_id)
+
+        # Ensure the service belongs to the current user
+        container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=service_id,
+            status='running'
+        ).first()
+
+        if not container:
+            flash('No active container found for this service', 'danger')
+            return redirect(url_for('service.backups', service_id=service_id))
+
+        success, message = backup_manager.restore_backup(service, container, backup_file)
+
+        if success:
+            flash('Backup restored successfully', 'success')
+        else:
+            flash(f'Failed to restore backup: {message}', 'danger')
+
+        return redirect(url_for('service.backups', service_id=service_id))
+
+    except Exception as e:
+        logger.error(f"Error restoring backup: {str(e)}")
+        flash('An error occurred while restoring the backup', 'danger')
+        return redirect(url_for('service.backups', service_id=service_id))
