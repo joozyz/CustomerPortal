@@ -11,6 +11,7 @@
                 <p class="text-center mb-4">
                     You'll be redirected to Stripe's secure checkout page to set up your payment method.
                 </p>
+                <div id="error-message" class="alert alert-danger d-none"></div>
                 <form id="checkout-form" method="POST">
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary" id="checkout-button">
@@ -31,10 +32,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const stripe = Stripe('{{ stripe_publishable_key }}');
     const form = document.getElementById('checkout-form');
     const submitButton = document.getElementById('checkout-button');
+    const errorMessage = document.getElementById('error-message');
 
     form.addEventListener('submit', async function(event) {
         event.preventDefault();
         submitButton.disabled = true;
+        errorMessage.classList.add('d-none');
 
         try {
             const response = await fetch('/billing/create-setup-session', {
@@ -44,24 +47,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            const session = await response.json();
+            const data = await response.json();
 
-            if (session.error) {
-                throw new Error(session.error);
+            if (!response.ok) {
+                throw new Error(data.error || 'An error occurred');
             }
 
-            // Redirect to Stripe Checkout
-            const result = await stripe.redirectToCheckout({
-                sessionId: session.id
+            const { error } = await stripe.redirectToCheckout({
+                sessionId: data.id
             });
 
-            if (result.error) {
-                throw new Error(result.error.message);
+            if (error) {
+                throw error;
             }
         } catch (error) {
             console.error('Error:', error);
+            errorMessage.textContent = error.message;
+            errorMessage.classList.remove('d-none');
             submitButton.disabled = false;
-            alert('An error occurred. Please try again.');
         }
     });
 });
