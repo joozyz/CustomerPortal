@@ -1,0 +1,59 @@
+## Python Web App: Secure Cloud Service Management Platform
+
+**Develop a secure and feature-rich customer portal for managing hosting and cloud services.**
+
+**Key Features:**
+
+* **Customer Management:**
+    * Secure registration/login (2FA, rate limiting).
+    * Stripe integration for billing and customer data.
+    * Customer profiles with service history, quotas, and billing.
+* **Service Management:**
+    * Service catalog with descriptions and pricing.
+    * Automated deployment using Podman Compose (rootless containers).
+    * Service monitoring, backup, and alteration.
+    * Quota management and usage-based billing.
+    * SSL/TLS management (Let's Encrypt, manual upload).
+    * Site migration (FTP/SFTP/SSH).
+    * Backup-as-a-Service.
+    * Mail hosting account creation via API.
+* **Admin Backend:**
+    * Secure dashboard (`/dashboard`).
+    * Linux node management.
+    * Service configuration and management.
+    * Branding customization.
+    * Interactive quizzes/guides for service configuration.
+    * Monitoring and logging (SIEM integration).
+    * Exoscale resource usage and billing integration.
+    * SMTP configuration (user-configurable).
+    * API integrations (Stripe, Exoscale, cloud.autodns.com, mail server).
+    * Domain and mailbox management.
+* **Security:**
+    * NIST and PCI-DSS compliant.
+    * Data-at-rest encryption.
+    * WAF for web attack protection.
+    * Intrusion detection and prevention.
+    * Secure API design.
+    * Regular security audits.
+
+**User Experience:**
+
+* Apple-like frontend with customizable styling.
+* Customer view: service overview, billing, support, domain management.
+* Admin dashboard: 360° system overview, customer management, infrastructure management, reporting, backup/restore, service configuration, quiz/guide builder.
+
+**Technology Stack:**
+
+* Python (FastAPI), SQLAlchemy, Podman SDK, Stripe API.
+* PostgreSQL, Node.js/Nginx.
+* Podman and Podman Compose.
+* React or Vue.js, Tailwind CSS.
+
+**Requirements:**
+
+* Modular design.
+* Scalable architecture.
+* Comprehensive testing.
+* Detailed documentation.
+
+**Prioritize security, scalability, and user experience throughout development.**

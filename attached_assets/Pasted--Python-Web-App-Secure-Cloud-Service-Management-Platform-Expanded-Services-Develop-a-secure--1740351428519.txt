@@ -1,0 +1,65 @@
+## Python Web App: Secure Cloud Service Management Platform (Expanded Services)
+
+**Develop a secure and feature-rich customer portal for managing a wider range of hosting and cloud services.**
+
+**Key Features:**
+
+* **Customer Management:**
+    * Secure registration/login (2FA, rate limiting).
+    * Stripe integration for billing and customer data.
+    * Customer profiles with service history, quotas, and billing.
+* **Service Management:**
+    * **Expanded Service Catalog:**
+        * **Web Hosting:** Support for various web applications and frameworks (not just WordPress).
+        * **Mail Hosting:** Mailbox creation, management, and spam filtering.
+        * **Domain Management:** Registration, DNS management, and transfer.
+        * **Backup Services:** Automated backups for websites, databases, and mailboxes.
+    * Automated deployment using Podman Compose (rootless containers).
+    * Service monitoring, alteration, and resource scaling.
+    * Quota management and usage-based billing.
+    * SSL/TLS management (Let's Encrypt, manual upload).
+    * Site migration (FTP/SFTP/SSH).
+    * Backup-as-a-Service.
+* **Admin Backend:**
+    * Secure dashboard (`/dashboard`).
+    * Linux node management.
+    * Service configuration and management.
+    * Branding customization.
+    * Interactive quizzes/guides for service configuration.
+    * Monitoring and logging (SIEM integration).
+    * Exoscale resource usage and billing integration.
+    * SMTP configuration (user-configurable).
+    * API integrations (Stripe, Exoscale, cloud.autodns.com, mail server, spam filter provider).
+    * Domain and mailbox management.
+    * **Spam Filter Management:** Configuration and integration with mail servers.
+* **Security:**
+    * NIST and PCI-DSS compliant.
+    * Data-at-rest encryption.
+    * WAF for web attack protection.
+    * Intrusion detection and prevention.
+    * Secure API design.
+    * Regular security audits.
+
+**User Experience:**
+
+* Apple-like frontend with customizable styling.
+* Customer view: service overview, billing, support, domain management, **spam filter settings**.
+* Admin dashboard: 360° system overview, customer management, infrastructure management, reporting, backup/restore, service configuration, quiz/guide builder, **spam filter configuration**.
+
+**Technology Stack:**
+
+* Python (FastAPI), SQLAlchemy, Podman SDK, Stripe API.
+* PostgreSQL, Node.js/Nginx.
+* Podman and Podman Compose.
+* React or Vue.js, Tailwind CSS.
+
+**Requirements:**
+
+* Modular design.
+* Scalable architecture.
+* Comprehensive testing.
+* Detailed documentation.
+
+**Prioritize security, scalability, and user experience throughout development.**
+
+**Focus on providing a comprehensive suite of services beyond just WordPress, including robust mail hosting with spam filtering, domain management, and backup options.**
