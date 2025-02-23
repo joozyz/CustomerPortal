@@ -11,7 +11,10 @@
 <div class="row">
     {% for service in services %}
     <div class="col-md-4 mb-4">
-        <div class="card h-100">
+        <div class="card h-100 service-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">{{ service.name }}</h5>
+            </div>
             <div class="card-body">
                 {% if current_user.is_admin %}
                 <form action="{{ url_for('service.update_service', service_id=service.id) }}" method="POST" class="service-edit-form">
@@ -21,22 +24,47 @@
                         <span class="input-group-text">$</span>
                         <input type="number" class="form-control" name="price" value="{{ service.price }}" step="0.01" required>
                     </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">CPU Cores</label>
+                            <input type="number" class="form-control" name="cpu_quota" value="{{ service.cpu_quota }}" step="0.1" min="0.1" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Memory (MB)</label>
+                            <input type="number" class="form-control" name="memory_quota" value="{{ service.memory_quota }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Storage (MB)</label>
+                            <input type="number" class="form-control" name="storage_quota" value="{{ service.storage_quota }}" required>
+                        </div>
+                    </div>
                     {% if service.container_image %}
-                    <input type="text" class="form-control mb-2" name="container_image" value="{{ service.container_image }}" required>
-                    <input type="number" class="form-control mb-2" name="container_port" value="{{ service.container_port }}" required>
+                    <input type="text" class="form-control mt-2" name="container_image" value="{{ service.container_image }}" required>
+                    <input type="number" class="form-control mt-2" name="container_port" value="{{ service.container_port }}" required>
                     {% endif %}
-                    <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                    <div class="form-check mt-2">
+                        <input type="checkbox" class="form-check-input" name="backup_enabled" {% if service.backup_enabled %}checked{% endif %}>
+                        <label class="form-check-label">Enable Backups</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm mt-2">Save Changes</button>
                 </form>
                 {% else %}
-                <h5 class="card-title">{{ service.name }}</h5>
                 <p class="card-text">{{ service.description }}</p>
-                <h6 class="card-subtitle mb-2 text-muted">${{ "%.2f"|format(service.price) }}/month</h6>
+                <div class="specs-list mt-3">
+                    <p><i data-feather="cpu"></i> {{ service.cpu_quota }} CPU Cores</p>
+                    <p><i data-feather="database"></i> {{ service.memory_quota }}MB Memory</p>
+                    <p><i data-feather="hard-drive"></i> {{ service.storage_quota }}MB Storage</p>
+                    {% if service.backup_enabled %}
+                    <p><i data-feather="save"></i> Daily Backups Included</p>
+                    {% endif %}
+                </div>
+                <h6 class="card-subtitle mb-2 text-muted pricing-text">${{ "%.2f"|format(service.price) }}/month</h6>
                 {% endif %}
 
                 {% if service.container_image %}
                 <p class="card-text mt-2">
                     <small class="text-muted">
-                        <i class="feather-icon" data-feather="box"></i> Container Service
+                        <i data-feather="box"></i> Containerized Service
                     </small>
                 </p>
                 {% endif %}

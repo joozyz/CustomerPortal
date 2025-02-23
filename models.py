@@ -80,7 +80,15 @@ class Service(db.Model):
     container_image = db.Column(db.String(200))
     container_port = db.Column(db.Integer)
     environment_vars = db.Column(db.JSON)
+    # New fields for service management
+    cpu_quota = db.Column(db.Float, default=1.0)  # CPU cores
+    memory_quota = db.Column(db.Integer, default=512)  # MB
+    storage_quota = db.Column(db.Integer, default=1024)  # MB
+    backup_enabled = db.Column(db.Boolean, default=False)
+    backup_retention_days = db.Column(db.Integer, default=7)
+    monitoring_enabled = db.Column(db.Boolean, default=True)
     subscriptions = db.relationship('Subscription', backref='service', lazy='dynamic')
+    containers = db.relationship('Container', backref='service', lazy='dynamic')
 
 class Container(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -90,9 +98,14 @@ class Container(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     service_id = db.Column(db.Integer, db.ForeignKey('service.id'), nullable=False)
-    service = db.relationship('Service', backref=db.backref('containers', lazy='dynamic'))
     port = db.Column(db.Integer)
     environment = db.Column(db.JSON)
+    # New fields for monitoring
+    cpu_usage = db.Column(db.Float, default=0.0)
+    memory_usage = db.Column(db.Integer, default=0)
+    storage_usage = db.Column(db.Integer, default=0)
+    last_backup = db.Column(db.DateTime)
+    last_monitored = db.Column(db.DateTime)
 
 class Subscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
