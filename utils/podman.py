@@ -1,6 +1,6 @@
 import podman
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from models import Container, Service
 
 class PodmanManager:
@@ -13,17 +13,118 @@ class PodmanManager:
             self.logger.error(f"Failed to initialize Podman client: {str(e)}")
             raise
 
+    def deploy_lemp_stack(self, service: Service, user_id: int) -> Optional[Container]:
+        try:
+            stack_name = f"sites-{user_id}"
+
+            # Pull required images
+            images = [
+                'docker.io/nginx:latest',
+                'docker.io/php:8.2-fpm',
+                'docker.io/mariadb:latest',
+                'docker.io/adminer:latest'
+            ]
+
+            for image in images:
+                try:
+                    self.logger.info(f"Pulling image: {image}")
+                    self.client.images.pull(image)
+                except Exception as e:
+                    self.logger.error(f"Failed to pull image {image}: {str(e)}")
+                    return None
+
+            # Create MariaDB container
+            db_container = self.client.containers.create(
+                name=f"{stack_name}-db",
+                image='docker.io/mariadb:latest',
+                environment={
+                    'MYSQL_ROOT_PASSWORD': 'changeme',
+                    'MYSQL_DATABASE': 'wordpress',
+                    'MYSQL_USER': 'wordpress',
+                    'MYSQL_PASSWORD': 'wordpress'
+                },
+                detach=True
+            )
+
+            # Create PHP-FPM container
+            php_container = self.client.containers.create(
+                name=f"{stack_name}-php",
+                image='docker.io/php:8.2-fpm',
+                detach=True
+            )
+
+            # Create Nginx container with port mapping
+            nginx_container = self.client.containers.create(
+                name=f"{stack_name}-nginx",
+                image='docker.io/nginx:latest',
+                ports={'80/tcp': None},  # Dynamically assign host port
+                detach=True
+            )
+
+            # Create Adminer container
+            adminer_container = self.client.containers.create(
+                name=f"{stack_name}-adminer",
+                image='docker.io/adminer:latest',
+                ports={'8080/tcp': None},
+                detach=True
+            )
+
+            # Start containers in order
+            for container in [db_container, php_container, nginx_container, adminer_container]:
+                try:
+                    container.start()
+                except Exception as e:
+                    self.logger.error(f"Failed to start container {container.name}: {str(e)}")
+                    self.cleanup_stack(stack_name)
+                    return None
+
+            # Get the assigned Nginx port
+            nginx_info = nginx_container.inspect()
+            nginx_port = int(nginx_info['NetworkSettings']['Ports']['80/tcp'][0]['HostPort'])
+
+            # Create Container record in database
+            db_container = Container(
+                container_id=nginx_container.id,  # Use Nginx container as main reference
+                name=stack_name,
+                status='running',
+                user_id=user_id,
+                service_id=service.id,
+                port=nginx_port,
+                environment={'stack_name': stack_name}
+            )
+
+            return db_container
+
+        except Exception as e:
+            self.logger.error(f"Error deploying LEMP stack: {str(e)}")
+            self.cleanup_stack(stack_name)
+            return None
+
+    def cleanup_stack(self, stack_name: str):
+        """Remove all containers in a stack if deployment fails"""
+        try:
+            containers = self.client.containers.list(all=True)
+            for container in containers:
+                if container.name.startswith(stack_name):
+                    try:
+                        container.remove(force=True)
+                    except:
+                        pass
+        except Exception as e:
+            self.logger.error(f"Error cleaning up stack {stack_name}: {str(e)}")
+
     def deploy_service(self, service: Service, user_id: int, environment: Optional[Dict[str, Any]] = None) -> Optional[Container]:
+        if service.name.lower() == 'sites':
+            return self.deploy_lemp_stack(service, user_id)
+
         try:
             if not service.container_image or not service.container_port:
                 self.logger.error("Service does not have container configuration")
                 return None
 
-            # Create container configuration
             container_name = f"{service.name.lower()}-{user_id}"
             environment = environment or {}
 
-            # Pull the image
             self.logger.info(f"Pulling image: {service.container_image}")
             try:
                 self.client.images.pull(service.container_image)
@@ -31,54 +132,27 @@ class PodmanManager:
                 self.logger.error(f"Failed to pull image {service.container_image}: {str(e)}")
                 return None
 
-            # Create and start the container
-            self.logger.info(f"Creating container: {container_name}")
             try:
                 container = self.client.containers.create(
                     name=container_name,
                     image=service.container_image,
                     environment=environment,
-                    ports={f'{service.container_port}/tcp': None},  # Dynamically assign host port
+                    ports={f'{service.container_port}/tcp': None},
                     detach=True
                 )
-            except Exception as e:
-                self.logger.error(f"Failed to create container: {str(e)}")
-                return None
-
-            try:
-                self.logger.info(f"Starting container: {container_name}")
                 container.start()
             except Exception as e:
-                self.logger.error(f"Failed to start container: {str(e)}")
-                try:
-                    container.remove(force=True)
-                except:
-                    pass
+                self.logger.error(f"Failed to create/start container: {str(e)}")
                 return None
 
-            # Get the assigned port
-            try:
-                container_info = container.inspect()
-                port_bindings = container_info['NetworkSettings']['Ports']
-                host_port = None
-                if f'{service.container_port}/tcp' in port_bindings:
-                    host_port = int(port_bindings[f'{service.container_port}/tcp'][0]['HostPort'])
-            except Exception as e:
-                self.logger.error(f"Failed to get container port: {str(e)}")
-                try:
-                    container.remove(force=True)
-                except:
-                    pass
-                return None
-
-            # Create Container record in database
+            # Create Container record
             db_container = Container(
                 container_id=container.id,
                 name=container_name,
                 status='running',
                 user_id=user_id,
                 service_id=service.id,
-                port=host_port,
+                port=container.ports[f'{service.container_port}/tcp'][0]['HostPort'],
                 environment=environment
             )
 
@@ -90,7 +164,6 @@ class PodmanManager:
 
     def stop_container(self, container_id: str) -> bool:
         try:
-            self.logger.info(f"Stopping container: {container_id}")
             container = self.client.containers.get(container_id)
             container.stop()
             return True
@@ -100,7 +173,6 @@ class PodmanManager:
 
     def remove_container(self, container_id: str) -> bool:
         try:
-            self.logger.info(f"Removing container: {container_id}")
             container = self.client.containers.get(container_id)
             container.remove(force=True)
             return True
