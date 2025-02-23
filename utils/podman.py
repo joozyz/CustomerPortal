@@ -2,6 +2,7 @@ import podman
 import logging
 from typing import Optional, Dict, Any, List, Tuple
 from models import Container, Service
+import os
 
 class PodmanManager:
     def __init__(self):
@@ -162,12 +163,109 @@ class PodmanManager:
         except Exception as e:
             self.logger.error(f"Error cleaning up stack {stack_name}: {str(e)}")
 
+    def deploy_wordpress(self, service: Service, user_id: int) -> Optional[Container]:
+        """Deploy a WordPress instance with MySQL database"""
+        if not self.check_system()[0]:
+            self.logger.error("Cannot deploy WordPress: Podman system check failed")
+            return None
+
+        try:
+            stack_name = f"wordpress-{user_id}"
+
+            # Create a pod for WordPress and MySQL
+            pod = self.client.pods.create(name=stack_name)
+
+            # Generate random passwords
+            db_password = os.urandom(16).hex()
+            wp_password = os.urandom(16).hex()
+
+            # Deploy MySQL container
+            mysql_container = self.client.containers.create(
+                name=f"{stack_name}-mysql",
+                image='docker.io/mysql:8.0',
+                environment={
+                    'MYSQL_ROOT_PASSWORD': db_password,
+                    'MYSQL_DATABASE': 'wordpress',
+                    'MYSQL_USER': 'wordpress',
+                    'MYSQL_PASSWORD': wp_password
+                },
+                pod=pod.id,
+                volumes=[f"{stack_name}-mysql-data:/var/lib/mysql"]
+            )
+
+            # Deploy WordPress container
+            wordpress_container = self.client.containers.create(
+                name=f"{stack_name}-wordpress",
+                image='docker.io/wordpress:latest',
+                environment={
+                    'WORDPRESS_DB_HOST': 'localhost',
+                    'WORDPRESS_DB_USER': 'wordpress',
+                    'WORDPRESS_DB_PASSWORD': wp_password,
+                    'WORDPRESS_DB_NAME': 'wordpress'
+                },
+                pod=pod.id,
+                ports={'80/tcp': None},
+                volumes=[f"{stack_name}-wordpress:/var/www/html"]
+            )
+
+            # Start the pod which will start all containers
+            pod.start()
+
+            # Get the assigned WordPress port
+            pod_info = pod.inspect()
+            wordpress_port = int(pod_info['Ports'][0]['HostPort'])
+
+            # Create Container record in database
+            db_container = Container(
+                container_id=pod.id,
+                name=stack_name,
+                status='running',
+                user_id=user_id,
+                service_id=service.id,
+                port=wordpress_port,
+                environment={
+                    'stack_name': stack_name,
+                    'db_password': db_password,
+                    'wp_password': wp_password
+                }
+            )
+
+            return db_container
+
+        except Exception as e:
+            self.logger.error(f"Error deploying WordPress: {str(e)}")
+            self.cleanup_wordpress(stack_name)
+            return None
+
+    def cleanup_wordpress(self, stack_name: str):
+        """Remove WordPress deployment and associated volumes"""
+        if not self.client:
+            return
+
+        try:
+            # Remove the pod (this will remove all containers in the pod)
+            pods = self.client.pods.list()
+            for pod in pods:
+                if pod.name == stack_name:
+                    pod.remove(force=True)
+
+            # Remove volumes
+            volumes = self.client.volumes.list()
+            for volume in volumes:
+                if volume.name.startswith(stack_name):
+                    volume.remove(force=True)
+
+        except Exception as e:
+            self.logger.error(f"Error cleaning up WordPress deployment {stack_name}: {str(e)}")
+
     def deploy_service(self, service: Service, user_id: int, environment: Optional[Dict[str, Any]] = None) -> Optional[Container]:
         if not self.check_system()[0]:
             self.logger.error("Cannot deploy service: Podman system check failed")
             return None
 
-        if service.name.lower() == 'sites':
+        if service.name.lower() == 'wordpress':
+            return self.deploy_wordpress(service, user_id)
+        elif service.name.lower() == 'sites':
             return self.deploy_lemp_stack(service, user_id)
 
         try:

@@ -2,11 +2,60 @@ from flask import Blueprint, render_template, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
 from models import Service, Container, Subscription
+from utils.podman import podman_manager
+from datetime import datetime
 import logging
 import os
 
 service = Blueprint('service', __name__)
 logger = logging.getLogger(__name__)
+
+@service.route('/services/wordpress/deploy', methods=['POST'])
+@login_required
+def deploy_wordpress():
+    """Deploy a new WordPress instance"""
+    try:
+        # Get WordPress service
+        wordpress_service = Service.query.filter_by(name='WordPress').first()
+        if not wordpress_service:
+            flash('WordPress service is not available', 'danger')
+            return redirect(url_for('service.service_catalog'))
+
+        # Check if user already has an active WordPress instance
+        existing_container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=wordpress_service.id,
+            status='running'
+        ).first()
+
+        if existing_container:
+            flash('You already have an active WordPress instance', 'warning')
+            return redirect(url_for('service.dashboard'))
+
+        # Deploy WordPress using Podman
+        container = podman_manager.deploy_wordpress(
+            service=wordpress_service,
+            user_id=current_user.id
+        )
+
+        if container:
+            try:
+                db.session.add(container)
+                db.session.commit()
+                flash('WordPress deployed successfully! You can access it from your dashboard.', 'success')
+            except Exception as e:
+                logger.error(f"Failed to save WordPress container to database: {str(e)}")
+                podman_manager.cleanup_wordpress(container.name)
+                flash('Failed to deploy WordPress. Please try again later.', 'danger')
+        else:
+            flash('Failed to deploy WordPress. Please try again later.', 'danger')
+
+        return redirect(url_for('service.dashboard'))
+
+    except Exception as e:
+        logger.error(f"Error in WordPress deployment: {str(e)}")
+        flash('An error occurred while deploying WordPress', 'danger')
+        return redirect(url_for('service.dashboard'))
 
 @service.route('/dashboard')
 @login_required
