@@ -20,6 +20,7 @@ def dashboard():
         services = Service.query.join(Container).filter(
             Container.user_id == current_user.id
         ).all()
+        logger.debug(f"Found {len(services)} services for user {current_user.id}")
 
         return render_template('dashboard.html',
                              services=services)
@@ -28,7 +29,7 @@ def dashboard():
         flash('An error occurred while loading the dashboard', 'danger')
         return redirect(url_for('main.index'))
 
-@service.route('/services/catalog')
+@service.route('/catalog')
 def service_catalog():
     """Display available services"""
     try:
