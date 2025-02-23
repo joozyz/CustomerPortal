@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
 from models import Service, Container
-from utils import podman_manager
+from utils.podman_manager import podman_manager
 import logging
+from datetime import datetime
 
 service = Blueprint('service', __name__)
 
@@ -45,7 +46,7 @@ def deploy_service(service_id):
         flash('Service is already deployed', 'warning')
         return redirect(url_for('service.service_catalog'))
 
-    # Deploy the service using Podman
+    # Deploy the service using Podman with resource quotas
     container = podman_manager.deploy_service(
         service=service,
         user_id=current_user.id,
@@ -74,5 +75,56 @@ def container_status(container_id):
     if container.user_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
 
+    # Get detailed container status including resource usage
     status = podman_manager.get_container_status(container.container_id)
-    return jsonify({'status': status})
+
+    # Update container metrics in database
+    if isinstance(status, dict):
+        try:
+            container.status = status.get('status', 'unknown')
+            container.cpu_usage = status.get('cpu_usage', 0.0)
+            container.memory_usage = status.get('memory_usage', 0)
+            container.last_monitored = datetime.utcnow()
+            db.session.commit()
+        except Exception as e:
+            logging.error(f"Failed to update container metrics: {str(e)}")
+
+    return jsonify(status)
+
+@service.route('/containers/<int:container_id>/stop', methods=['POST'])
+@login_required
+def stop_container(container_id):
+    container = Container.query.get_or_404(container_id)
+
+    # Ensure the container belongs to the current user
+    if container.user_id != current_user.id:
+        flash('Unauthorized action', 'danger')
+        return redirect(url_for('service.dashboard'))
+
+    if podman_manager.stop_container(container.container_id):
+        container.status = 'stopped'
+        db.session.commit()
+        flash('Container stopped successfully', 'success')
+    else:
+        flash('Failed to stop container', 'danger')
+
+    return redirect(url_for('service.dashboard'))
+
+@service.route('/containers/<int:container_id>/remove', methods=['POST'])
+@login_required
+def remove_container(container_id):
+    container = Container.query.get_or_404(container_id)
+
+    # Ensure the container belongs to the current user
+    if container.user_id != current_user.id:
+        flash('Unauthorized action', 'danger')
+        return redirect(url_for('service.dashboard'))
+
+    if podman_manager.remove_container(container.container_id):
+        db.session.delete(container)
+        db.session.commit()
+        flash('Container removed successfully', 'success')
+    else:
+        flash('Failed to remove container', 'danger')
+
+    return redirect(url_for('service.dashboard'))
