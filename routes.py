@@ -122,6 +122,10 @@ def update_service(service_id):
 def deploy_service(service_id):
     service = Service.query.get_or_404(service_id)
 
+    if not service.container_image or not service.container_port:
+        flash('This service does not support container deployment', 'danger')
+        return redirect(url_for('service_catalog'))
+
     # Check if service is already deployed for this user
     existing_container = Container.query.filter_by(
         user_id=current_user.id,
@@ -141,11 +145,15 @@ def deploy_service(service_id):
     )
 
     if container:
-        db.session.add(container)
-        db.session.commit()
-        flash('Service deployed successfully', 'success')
+        try:
+            db.session.add(container)
+            db.session.commit()
+            flash('Service deployed successfully! You can view it in your dashboard.', 'success')
+        except Exception as e:
+            logging.error(f"Failed to save container to database: {str(e)}")
+            flash('Service deployed but failed to save details. Please contact support.', 'warning')
     else:
-        flash('Failed to deploy service', 'danger')
+        flash('Failed to deploy service. Please try again later.', 'danger')
 
     return redirect(url_for('service_catalog'))
 

@@ -6,8 +6,8 @@ from models import Container, Service
 class PodmanManager:
     def __init__(self):
         try:
-            # Initialize podman client with system connection
-            self.client = podman.PodmanClient(uri='unix:///run/podman/podman.sock')
+            # Initialize podman client with rootless connection
+            self.client = podman.PodmanClient(uri='unix:///run/user/1000/podman/podman.sock')
             self.logger = logging.getLogger(__name__)
         except Exception as e:
             self.logger.error(f"Failed to initialize Podman client: {str(e)}")
@@ -15,33 +15,61 @@ class PodmanManager:
 
     def deploy_service(self, service: Service, user_id: int, environment: Optional[Dict[str, Any]] = None) -> Optional[Container]:
         try:
+            if not service.container_image or not service.container_port:
+                self.logger.error("Service does not have container configuration")
+                return None
+
             # Create container configuration
             container_name = f"{service.name.lower()}-{user_id}"
             environment = environment or {}
 
             # Pull the image
             self.logger.info(f"Pulling image: {service.container_image}")
-            self.client.images.pull(service.container_image)
+            try:
+                self.client.images.pull(service.container_image)
+            except Exception as e:
+                self.logger.error(f"Failed to pull image {service.container_image}: {str(e)}")
+                return None
 
             # Create and start the container
             self.logger.info(f"Creating container: {container_name}")
-            container = self.client.containers.create(
-                name=container_name,
-                image=service.container_image,
-                environment=environment,
-                ports={f'{service.container_port}/tcp': None},  # Dynamically assign host port
-                detach=True
-            )
+            try:
+                container = self.client.containers.create(
+                    name=container_name,
+                    image=service.container_image,
+                    environment=environment,
+                    ports={f'{service.container_port}/tcp': None},  # Dynamically assign host port
+                    detach=True
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to create container: {str(e)}")
+                return None
 
-            self.logger.info(f"Starting container: {container_name}")
-            container.start()
+            try:
+                self.logger.info(f"Starting container: {container_name}")
+                container.start()
+            except Exception as e:
+                self.logger.error(f"Failed to start container: {str(e)}")
+                try:
+                    container.remove(force=True)
+                except:
+                    pass
+                return None
 
             # Get the assigned port
-            container_info = container.inspect()
-            port_bindings = container_info['NetworkSettings']['Ports']
-            host_port = None
-            if f'{service.container_port}/tcp' in port_bindings:
-                host_port = int(port_bindings[f'{service.container_port}/tcp'][0]['HostPort'])
+            try:
+                container_info = container.inspect()
+                port_bindings = container_info['NetworkSettings']['Ports']
+                host_port = None
+                if f'{service.container_port}/tcp' in port_bindings:
+                    host_port = int(port_bindings[f'{service.container_port}/tcp'][0]['HostPort'])
+            except Exception as e:
+                self.logger.error(f"Failed to get container port: {str(e)}")
+                try:
+                    container.remove(force=True)
+                except:
+                    pass
+                return None
 
             # Create Container record in database
             db_container = Container(
