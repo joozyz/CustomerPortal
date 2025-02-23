@@ -84,3 +84,31 @@ body {
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
 }
+
+/* Stripe Elements styling */
+#card-element {
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: white;
+}
+
+#card-element.StripeElement--focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+#card-element.StripeElement--invalid {
+    border-color: #dc3545;
+}
+
+#card-errors {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.payment-form .form-control {
+    margin-bottom: 1rem;
+}
