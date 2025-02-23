@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, jsonify, request
+from flask import Blueprint, render_template, redirect, url_for, flash, jsonify, request, send_file
 from flask_login import login_required, current_user
 from app import db
 from models import Service, Container, Subscription
@@ -335,3 +335,71 @@ def restore_backup(service_id, backup_file):
         logger.error(f"Error restoring backup: {str(e)}")
         flash('An error occurred while restoring the backup', 'danger')
         return redirect(url_for('service.backups', service_id=service_id))
+
+@service.route('/services/<int:service_id>/backup/settings', methods=['POST'])
+@login_required
+def update_backup_settings(service_id):
+    """Update backup settings for a service"""
+    try:
+        service = Service.query.get_or_404(service_id)
+
+        # Ensure the service belongs to the current user
+        container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=service_id
+        ).first()
+
+        if not container:
+            flash('No container found for this service', 'danger')
+            return redirect(url_for('service.dashboard'))
+
+        # Update backup settings
+        service.backup_enabled = request.form.get('backup_enabled') == 'on'
+        service.backup_frequency = request.form.get('backup_frequency', 'daily')
+        retention_days = request.form.get('retention_days')
+        if retention_days and retention_days.isdigit():
+            service.backup_retention_days = int(retention_days)
+
+        db.session.commit()
+        flash('Backup settings updated successfully', 'success')
+
+        return redirect(url_for('service.list_backups', service_id=service_id))
+
+    except Exception as e:
+        logger.error(f"Error updating backup settings: {str(e)}")
+        flash('An error occurred while updating backup settings', 'danger')
+        return redirect(url_for('service.list_backups', service_id=service_id))
+
+@service.route('/services/<int:service_id>/backup/download/<path:backup_file>')
+@login_required
+def download_backup(service_id, backup_file):
+    """Download a backup file"""
+    try:
+        service = Service.query.get_or_404(service_id)
+
+        # Ensure the service belongs to the current user
+        container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=service_id
+        ).first()
+
+        if not container:
+            flash('No container found for this service', 'danger')
+            return redirect(url_for('service.dashboard'))
+
+        backup_path = os.path.join(backup_manager.backup_base_path, str(service_id), backup_file)
+
+        if not os.path.exists(backup_path):
+            flash('Backup file not found', 'danger')
+            return redirect(url_for('service.list_backups', service_id=service_id))
+
+        return send_file(
+            backup_path,
+            as_attachment=True,
+            download_name=f"{service.name}_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.tar.gz"
+        )
+
+    except Exception as e:
+        logger.error(f"Error downloading backup: {str(e)}")
+        flash('An error occurred while downloading the backup', 'danger')
+        return redirect(url_for('service.list_backups', service_id=service_id))

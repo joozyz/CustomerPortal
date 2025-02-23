@@ -80,6 +80,9 @@
                                     <td>
                                         {% if service.last_backup_at %}
                                             {{ service.last_backup_at.strftime('%Y-%m-%d %H:%M') }}
+                                            <a href="{{ url_for('service.list_backups', service_id=service.id) }}" class="text-info">
+                                                <i data-feather="external-link" class="icon-sm"></i>
+                                            </a>
                                         {% else %}
                                             No backups
                                         {% endif %}
@@ -88,12 +91,15 @@
                                         <div class="btn-group">
                                             <form action="{{ url_for('service.create_backup', service_id=service.id) }}" method="POST" class="d-inline">
                                                 <button type="submit" class="btn btn-sm btn-success" {% if not service.backup_enabled %}disabled{% endif %}>
-                                                    Backup Now
+                                                    <i data-feather="save" class="icon-sm me-1"></i> Backup Now
                                                 </button>
                                             </form>
+                                            <a href="{{ url_for('service.list_backups', service_id=service.id) }}" class="btn btn-sm btn-info">
+                                                <i data-feather="hard-drive" class="icon-sm me-1"></i> Manage Backups
+                                            </a>
                                             {% if service.domain %}
                                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#domainModal{{ service.id }}">
-                                                Update Domain
+                                                <i data-feather="globe" class="icon-sm me-1"></i> Update Domain
                                             </button>
                                             {% endif %}
                                         </div>

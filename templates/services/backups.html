@@ -55,7 +55,7 @@
                         <h5 class="card-title">Available Backups</h5>
                         <form action="{{ url_for('service.create_backup', service_id=service.id) }}" method="POST" class="d-inline">
                             <button type="submit" class="btn btn-primary" {% if not service.backup_enabled %}disabled{% endif %}>
-                                Create Backup Now
+                                <i data-feather="save" class="icon-sm me-1"></i> Create Backup Now
                             </button>
                         </form>
                     </div>
@@ -81,12 +81,12 @@
                                                       method="POST" class="d-inline">
                                                     <button type="submit" class="btn btn-warning btn-sm" 
                                                             onclick="return confirm('Are you sure you want to restore this backup? This will override current data.')">
-                                                        Restore
+                                                        <i data-feather="refresh-cw" class="icon-sm me-1"></i> Restore
                                                     </button>
                                                 </form>
                                                 <a href="{{ url_for('service.download_backup', service_id=service.id, backup_file=backup.filename) }}" 
                                                    class="btn btn-info btn-sm">
-                                                    Download
+                                                    <i data-feather="download" class="icon-sm me-1"></i> Download
                                                 </a>
                                             </div>
                                         </td>
@@ -103,4 +103,13 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Feather icons
+    feather.replace();
+});
+</script>
 {% endblock %}
