@@ -11,6 +11,7 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     profile = db.relationship('CustomerProfile', backref='user', uselist=False)
+    containers = db.relationship('Container', backref='user', lazy='dynamic')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -39,3 +40,18 @@ class Service(db.Model):
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    container_image = db.Column(db.String(200))
+    container_port = db.Column(db.Integer)
+    environment_vars = db.Column(db.JSON)
+
+class Container(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    container_id = db.Column(db.String(64), unique=True)
+    name = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(20), default='created')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    service_id = db.Column(db.Integer, db.ForeignKey('service.id'), nullable=False)
+    service = db.relationship('Service', backref=db.backref('containers', lazy='dynamic'))
+    port = db.Column(db.Integer)
+    environment = db.Column(db.JSON)

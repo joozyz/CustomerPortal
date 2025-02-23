@@ -16,11 +16,24 @@
                 <h5 class="card-title">{{ service.name }}</h5>
                 <p class="card-text">{{ service.description }}</p>
                 <h6 class="card-subtitle mb-2 text-muted">${{ "%.2f"|format(service.price) }}</h6>
+                {% if service.container_image %}
+                <p class="card-text">
+                    <small class="text-muted">
+                        <i class="feather-icon" data-feather="box"></i> Container Service
+                    </small>
+                </p>
+                {% endif %}
             </div>
             <div class="card-footer">
                 <a href="#" class="btn btn-primary">Learn More</a>
                 {% if current_user.is_authenticated %}
-                <a href="#" class="btn btn-success">Purchase</a>
+                    {% if service.container_image %}
+                        <form action="{{ url_for('deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-success">Deploy Service</button>
+                        </form>
+                    {% else %}
+                        <a href="#" class="btn btn-success">Purchase</a>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
