@@ -85,6 +85,26 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
+@app.route('/services/<int:service_id>/update', methods=['POST'])
+@login_required
+@admin_required
+def update_service(service_id):
+    service = Service.query.get_or_404(service_id)
+
+    if request.method == 'POST':
+        service.name = request.form.get('name')
+        service.description = request.form.get('description')
+        service.price = float(request.form.get('price'))
+
+        if service.container_image:
+            service.container_image = request.form.get('container_image')
+            service.container_port = int(request.form.get('container_port'))
+
+        db.session.commit()
+        flash('Service updated successfully', 'success')
+
+    return redirect(url_for('service_catalog'))
+
 @app.route('/services/<int:service_id>/deploy', methods=['POST'])
 @login_required
 def deploy_service(service_id):
