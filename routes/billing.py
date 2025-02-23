@@ -21,13 +21,18 @@ def setup_billing():
     """Handle billing setup and create Stripe checkout session"""
     if request.method == 'POST':
         try:
+            logger.info(f"Starting billing setup for user {current_user.id}")
+
             if not current_user.stripe_customer_id:
-                # Create a new Stripe customer
-                customer = create_stripe_customer(current_user)
-                if not customer:
+                logger.info("Creating new Stripe customer")
+                customer_id = create_stripe_customer(current_user)
+                if not customer_id:
+                    logger.error("Failed to create Stripe customer")
                     raise Exception("Failed to create Stripe customer")
-                current_user.stripe_customer_id = customer
+
+                current_user.stripe_customer_id = customer_id
                 db.session.commit()
+                logger.info(f"Created Stripe customer: {customer_id}")
 
             # Create Stripe Checkout session for setup
             session = stripe.checkout.Session.create(
@@ -38,11 +43,15 @@ def setup_billing():
                 cancel_url=request.host_url.rstrip('/') + url_for('billing.setup_cancelled'),
             )
 
-            # Redirect directly to Stripe
+            logger.info(f"Created Stripe session: {session.id}")
             return redirect(session.url)
 
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error during setup: {str(e)}")
+            flash('An error occurred with the payment processor. Please try again.', 'danger')
+            return redirect(url_for('billing.setup_billing'))
         except Exception as e:
-            logger.error(f"Error creating setup session: {str(e)}")
+            logger.error(f"Error during billing setup: {str(e)}")
             flash('Failed to initialize payment setup. Please try again.', 'danger')
             return redirect(url_for('billing.setup_billing'))
 
@@ -53,13 +62,34 @@ def setup_billing():
 @login_required
 def setup_success():
     """Handle successful payment method setup"""
-    flash('Payment method added successfully!', 'success')
+    try:
+        # Verify the setup was successful
+        if not current_user.stripe_customer_id:
+            logger.error("Setup success called but no Stripe customer ID found")
+            flash('There was an error setting up your payment method.', 'danger')
+            return redirect(url_for('billing.setup_billing'))
+
+        # Create or update billing info
+        billing_info = BillingInfo.query.filter_by(profile_id=current_user.profile.id).first()
+        if not billing_info:
+            billing_info = BillingInfo(profile=current_user.profile)
+            db.session.add(billing_info)
+
+        db.session.commit()
+        logger.info(f"Payment setup completed successfully for user {current_user.id}")
+        flash('Payment method added successfully!', 'success')
+
+    except Exception as e:
+        logger.error(f"Error in setup success: {str(e)}")
+        flash('There was an error completing your payment setup.', 'danger')
+
     return redirect(url_for('service.dashboard'))
 
 @billing.route('/setup/cancelled')
 @login_required
 def setup_cancelled():
     """Handle cancelled payment method setup"""
+    logger.info(f"Payment setup cancelled by user {current_user.id}")
     flash('Payment setup was cancelled.', 'warning')
     return redirect(url_for('service.dashboard'))
 

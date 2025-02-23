@@ -20,11 +20,16 @@
                 {% endwith %}
                 <form action="{{ url_for('billing.setup_billing') }}" method="POST">
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary btn-lg">
                             Continue to Secure Checkout
                         </button>
                     </div>
                 </form>
+            </div>
+            <div class="card-footer text-center">
+                <small class="text-muted">
+                    Your payment information will be securely processed by Stripe.
+                </small>
             </div>
         </div>
     </div>
