@@ -30,7 +30,7 @@
                 {% else %}
                 <h5 class="card-title">{{ service.name }}</h5>
                 <p class="card-text">{{ service.description }}</p>
-                <h6 class="card-subtitle mb-2 text-muted">${{ "%.2f"|format(service.price) }}</h6>
+                <h6 class="card-subtitle mb-2 text-muted">${{ "%.2f"|format(service.price) }}/month</h6>
                 {% endif %}
 
                 {% if service.container_image %}
@@ -43,15 +43,21 @@
             </div>
             <div class="card-footer">
                 {% if current_user.is_authenticated %}
-                    {% if service.container_image %}
-                        <form action="{{ url_for('deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
-                            <button type="submit" class="btn btn-success">Deploy Service</button>
-                        </form>
+                    {% if not current_user.stripe_customer_id %}
+                        <a href="{{ url_for('billing.setup_billing') }}" class="btn btn-primary">Setup Billing First</a>
                     {% else %}
-                        <a href="#" class="btn btn-success">Purchase</a>
+                        {% if service.container_image %}
+                            <form action="{{ url_for('deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-success">Deploy Service</button>
+                            </form>
+                        {% else %}
+                            <form action="{{ url_for('billing.subscribe_service', service_id=service.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-success">Subscribe</button>
+                            </form>
+                        {% endif %}
                     {% endif %}
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-primary">Login to Deploy</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">Login to Subscribe</a>
                 {% endif %}
             </div>
         </div>

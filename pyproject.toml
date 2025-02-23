@@ -17,4 +17,5 @@ dependencies = [
     "podman>=5.4.0.1",
     "python-dotenv>=1.0.1",
     "trafilatura>=2.0.0",
+    "stripe>=11.5.0",
 ]

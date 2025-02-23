@@ -9,6 +9,7 @@ from flask_limiter.util import get_remote_address
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     pass
@@ -29,6 +30,14 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Configure Stripe
+stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
+if not stripe_secret_key:
+    logger.warning("STRIPE_SECRET_KEY not found in environment variables")
+
+app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
+app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
+
 # Configure Login Manager
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -45,8 +54,27 @@ limiter = Limiter(
 # Initialize database
 db.init_app(app)
 
-# Import routes after app initialization to avoid circular imports
+# Initialize application context and create database tables
 with app.app_context():
-    from routes import *
-    from models import *
+    # Import models first
+    from models import User
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+
+    # Create database tables
     db.create_all()
+    logger.info("Database tables created successfully")
+
+    try:
+        # Import and register blueprints
+        from routes import billing
+        app.register_blueprint(billing)
+        logger.info("Blueprints registered successfully")
+    except Exception as e:
+        logger.error(f"Error registering blueprints: {str(e)}")
+        raise
+
+    # Import main routes last to avoid circular imports
+    import routes

@@ -5,10 +5,6 @@ from models import User, Service, CustomerProfile, BillingInfo, Container
 from utils import admin_required, podman_manager
 import logging
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
 def login():

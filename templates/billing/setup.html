@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">Setup Billing</h3>
+            </div>
+            <div class="card-body">
+                <form id="payment-form" method="POST">
+                    <div class="mb-3">
+                        <label for="card-element" class="form-label">Credit or debit card</label>
+                        <div id="card-element" class="form-control">
+                            <!-- Stripe Elements will create input here -->
+                        </div>
+                        <div id="card-errors" class="invalid-feedback" role="alert"></div>
+                    </div>
+                    <input type="hidden" name="payment_method_id" id="payment-method-id">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="submit-button">
+                            Save Payment Method
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stripe = Stripe('{{ stripe_publishable_key }}');
+    const elements = stripe.elements();
+    const card = elements.create('card');
+    card.mount('#card-element');
+
+    const form = document.getElementById('payment-form');
+    const submitButton = document.getElementById('submit-button');
+
+    card.addEventListener('change', function(event) {
+        const displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+            displayError.style.display = 'block';
+        } else {
+            displayError.textContent = '';
+            displayError.style.display = 'none';
+        }
+    });
+
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        submitButton.disabled = true;
+
+        try {
+            const result = await stripe.createPaymentMethod({
+                type: 'card',
+                card: card,
+                billing_details: {
+                    email: '{{ current_user.email }}'
+                }
+            });
+
+            if (result.error) {
+                const errorElement = document.getElementById('card-errors');
+                errorElement.textContent = result.error.message;
+                errorElement.style.display = 'block';
+                submitButton.disabled = false;
+            } else {
+                document.getElementById('payment-method-id').value = result.paymentMethod.id;
+                form.submit();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            const errorElement = document.getElementById('card-errors');
+            errorElement.textContent = 'An error occurred while processing your payment method.';
+            errorElement.style.display = 'block';
+            submitButton.disabled = false;
+        }
+    });
+});
+</script>
+{% endblock %}

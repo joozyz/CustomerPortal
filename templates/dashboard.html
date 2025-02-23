@@ -18,10 +18,66 @@
                 <p><strong>Address:</strong> {{ current_user.profile.address or 'Not set' }}</p>
             </div>
         </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Billing Information</h5>
+                {% if current_user.profile.billing_info %}
+                    <p><strong>Card:</strong> **** **** **** {{ current_user.profile.billing_info.card_last4 }}</p>
+                    <p><strong>Type:</strong> {{ current_user.profile.billing_info.card_brand|title }}</p>
+                    <a href="{{ url_for('billing.setup_billing') }}" class="btn btn-outline-primary">Update Payment Method</a>
+                {% else %}
+                    <p>No payment method configured</p>
+                    <a href="{{ url_for('billing.setup_billing') }}" class="btn btn-primary">Setup Payment Method</a>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     <div class="col-md-8">
         <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Active Subscriptions</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Status</th>
+                                <th>Renewal Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subscription in current_user.subscriptions %}
+                            <tr>
+                                <td>{{ subscription.service.name }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if subscription.status == 'active' else 'warning' }}">
+                                        {{ subscription.status }}
+                                    </span>
+                                </td>
+                                <td>{{ subscription.current_period_end.strftime('%Y-%m-%d') if subscription.current_period_end else 'N/A' }}</td>
+                                <td>
+                                    {% if subscription.status == 'active' %}
+                                        <form action="{{ url_for('billing.cancel_service_subscription', subscription_id=subscription.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to cancel this subscription?')">Cancel</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4">No active subscriptions</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
             <div class="card-body">
                 <h5 class="card-title">Deployed Services</h5>
                 <div class="table-responsive">
@@ -39,7 +95,7 @@
                             <tr>
                                 <td>{{ container.service.name }}</td>
                                 <td>
-                                    <span class="badge bg-{{ 'success' if container.status == 'running' else 'warning' }}">
+                                    <span class="badge bg-{{ 'success' if container.status == 'running' else 'warning' }}" data-container-id="{{ container.id }}">
                                         {{ container.status }}
                                     </span>
                                 </td>
@@ -60,32 +116,6 @@
                                 <td colspan="4">No deployed services</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Recent Activity</h5>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Activity</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="3">No recent activity</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
