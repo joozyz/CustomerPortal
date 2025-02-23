@@ -24,39 +24,39 @@ def check_stripe_status():
         flash('Payment system is currently unavailable. Please try again later.', 'danger')
         return redirect(url_for('service.dashboard'))
 
-@billing.route('/billing/setup', methods=['GET'])
+@billing.route('/billing/setup', methods=['GET', 'POST'])
 @login_required
 def setup_billing():
-    """Display the billing setup page"""
-    return render_template('billing/setup.html', 
+    """Handle billing setup and create Stripe checkout session"""
+    if request.method == 'POST':
+        try:
+            if not current_user.stripe_customer_id:
+                # Create a new Stripe customer
+                customer = create_stripe_customer(current_user)
+                if not customer:
+                    raise Exception("Failed to create Stripe customer")
+                current_user.stripe_customer_id = customer
+                db.session.commit()
+
+            # Create Stripe Checkout session for setup
+            session = stripe.checkout.Session.create(
+                customer=current_user.stripe_customer_id,
+                payment_method_types=['card'],
+                mode='setup',
+                success_url=request.host_url.rstrip('/') + url_for('billing.setup_success'),
+                cancel_url=request.host_url.rstrip('/') + url_for('billing.setup_cancelled'),
+            )
+
+            # Redirect directly to Stripe
+            return redirect(session.url)
+
+        except Exception as e:
+            logger.error(f"Error creating setup session: {str(e)}")
+            flash('Failed to initialize payment setup. Please try again.', 'danger')
+            return redirect(url_for('billing.setup_billing'))
+
+    return render_template('billing/setup.html',
                          stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
-
-@billing.route('/billing/create-setup-session', methods=['POST'])
-@login_required
-def create_setup_session():
-    """Create a Stripe setup session for payment method configuration"""
-    try:
-        if not current_user.stripe_customer_id:
-            # Create a new Stripe customer
-            customer = create_stripe_customer(current_user)
-            if not customer:
-                raise Exception("Failed to create Stripe customer")
-            current_user.stripe_customer_id = customer
-            db.session.commit()
-
-        # Create Stripe Checkout session for setup
-        session = stripe.checkout.Session.create(
-            customer=current_user.stripe_customer_id,
-            payment_method_types=['card'],
-            mode='setup',
-            success_url=request.host_url.rstrip('/') + url_for('billing.setup_success'),
-            cancel_url=request.host_url.rstrip('/') + url_for('billing.setup_cancelled'),
-        )
-
-        return jsonify({'id': session.id})
-    except Exception as e:
-        logger.error(f"Error creating setup session: {str(e)}")
-        return jsonify({'error': str(e)}), 500
 
 @billing.route('/billing/setup/success')
 @login_required

@@ -11,10 +11,16 @@
                 <p class="text-center mb-4">
                     You'll be redirected to Stripe's secure checkout page to set up your payment method.
                 </p>
-                <div id="error-message" class="alert alert-danger d-none"></div>
-                <form id="checkout-form" method="POST">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                <form method="POST" action="{{ url_for('billing.setup_billing') }}">
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary" id="checkout-button">
+                        <button type="submit" class="btn btn-primary">
                             Continue to Secure Checkout
                         </button>
                     </div>
@@ -26,47 +32,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://js.stripe.com/v3/"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const stripe = Stripe('{{ stripe_publishable_key }}');
-    const form = document.getElementById('checkout-form');
-    const submitButton = document.getElementById('checkout-button');
-    const errorMessage = document.getElementById('error-message');
-
-    form.addEventListener('submit', async function(event) {
-        event.preventDefault();
-        submitButton.disabled = true;
-        errorMessage.classList.add('d-none');
-
-        try {
-            const response = await fetch('/billing/create-setup-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'An error occurred');
-            }
-
-            const { error } = await stripe.redirectToCheckout({
-                sessionId: data.id
-            });
-
-            if (error) {
-                throw error;
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            errorMessage.textContent = error.message;
-            errorMessage.classList.remove('d-none');
-            submitButton.disabled = false;
-        }
-    });
-});
-</script>
-{% endblock %}
+</block>
