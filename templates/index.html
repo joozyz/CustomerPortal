@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron text-center">
+    <h1 class="display-4">Welcome to Cloud Service Management</h1>
+    <p class="lead">Manage your cloud services efficiently and securely</p>
+    <hr class="my-4">
+    <p>Get started by exploring our services or signing up for an account.</p>
+    <p class="lead">
+        <a class="btn btn-primary btn-lg" href="{{ url_for('service_catalog') }}" role="button">View Services</a>
+        {% if not current_user.is_authenticated %}
+        <a class="btn btn-success btn-lg" href="{{ url_for('register') }}" role="button">Sign Up</a>
+        {% endif %}
+    </p>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <h3><i data-feather="cloud"></i> Cloud Services</h3>
+        <p>Access our wide range of cloud services designed for your needs.</p>
+    </div>
+    <div class="col-md-4">
+        <h3><i data-feather="shield"></i> Security First</h3>
+        <p>Your data security is our top priority with industry-standard protection.</p>
+    </div>
+    <div class="col-md-4">
+        <h3><i data-feather="help-circle"></i> 24/7 Support</h3>
+        <p>Get help whenever you need it with our dedicated support team.</p>
+    </div>
+</div>
+{% endblock %}
