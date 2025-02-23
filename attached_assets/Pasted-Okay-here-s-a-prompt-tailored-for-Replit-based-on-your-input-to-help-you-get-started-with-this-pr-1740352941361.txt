@@ -1,0 +1,71 @@
+Okay, here's a prompt tailored for Replit, based on your input, to help you get started with this project:
+
+**Replit Prompt**
+
+**Title:** Secure Cloud Service Management Platform
+
+**Description:**
+
+Build a comprehensive cloud service management platform with a customer-facing portal and a secure admin backend.  This platform will allow customers to manage a variety of services, including web hosting, mail hosting, domain management, and backups.
+
+**Features:**
+
+* **Customer Portal:**
+    * User registration/login (with 2FA and rate limiting).
+    * Service catalog and ordering.
+    * Service management dashboard (overview, billing, support, etc.).
+    * Domain management.
+    * Spam filter settings.
+* **Admin Backend:**
+    * Secure admin dashboard (`/dashboard`).
+    * Linux node management.
+    * Service configuration and management.
+    * Branding customization.
+    * Interactive quizzes/guides for service configuration.
+    * Monitoring and logging (consider integration with external SIEM if possible).
+    * Resource usage and billing integration (Exoscale or similar).
+    * SMTP configuration.
+    * API integrations (Stripe, domain provider, mail server, spam filter provider).
+    * Domain and mailbox management.
+    * Spam filter management.
+* **Security:**
+    * Implement security best practices (NIST and PCI-DSS compliance where applicable).
+    * Data encryption at rest.
+    * WAF for web attack protection.
+    * Secure API design.
+
+**Technology Stack:**
+
+* Python (FastAPI)
+* SQLAlchemy
+* Podman SDK
+* Stripe API
+* PostgreSQL
+* Node.js/Nginx
+* Podman and Podman Compose
+* React or Vue.js
+* Tailwind CSS
+
+**Instructions:**
+
+1.  Set up the project structure with separate folders for the frontend, backend, and database.
+2.  Implement user authentication and authorization for both the customer portal and admin backend.
+3.  Develop the customer-facing portal with a user-friendly interface for managing services.
+4.  Create the admin backend with tools for managing services, infrastructure, and customer data.
+5.  Implement API integrations with Stripe, Exoscale (or a similar provider), a domain provider, a mail server, and a spam filter provider.
+6.  Ensure that the platform is secure and complies with relevant security standards.
+7.  Write comprehensive documentation for the API and the platform's features.
+
+**Replit Specific Notes:**
+
+* Consider using Replit's database features for PostgreSQL hosting.
+* Utilize Replit's environment variables to manage sensitive API keys and secrets.
+* Take advantage of Replit's deployment features to easily deploy and share your project.
+
+**Challenges:**
+
+* Implementing robust security measures.
+* Integrating with multiple third-party APIs.
+* Designing a scalable and maintainable architecture.
+
+**This prompt provides a starting point for building a comprehensive cloud service management platform on Replit. Feel free to customize and expand upon these features to create a unique and powerful application.**
