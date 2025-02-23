@@ -155,6 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(session.error);
                 }
 
+                // Redirect to Stripe Checkout
                 const result = await stripe.redirectToCheckout({
                     sessionId: session.id
                 });
