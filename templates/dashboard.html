@@ -43,87 +43,91 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Active Subscriptions</h5>
+                <h5 class="card-title">Active Services</h5>
                 <div class="table-responsive">
                     <table class="table">
                         <thead>
                             <tr>
                                 <th>Service</th>
                                 <th>Status</th>
-                                <th>Renewal Date</th>
+                                <th>Domain</th>
+                                <th>Last Backup</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% if current_user.subscriptions.count() > 0 %}
-                                {% for subscription in current_user.subscriptions %}
+                            {% if services %}
+                                {% for service in services %}
                                 <tr>
-                                    <td>{{ subscription.service.name }}</td>
+                                    <td>{{ service.name }}</td>
                                     <td>
-                                        <span class="badge bg-{{ 'success' if subscription.status == 'active' else 'warning' }}">
-                                            {{ subscription.status }}
+                                        <span class="badge bg-{{ 'success' if service.domain_status == 'active' else 'warning' }}">
+                                            {{ service.domain_status }}
                                         </span>
                                     </td>
-                                    <td>{{ subscription.current_period_end.strftime('%Y-%m-%d') if subscription.current_period_end else 'N/A' }}</td>
                                     <td>
-                                        {% if subscription.status == 'active' %}
-                                            <form action="{{ url_for('billing.cancel_service_subscription', subscription_id=subscription.id) }}" method="POST" class="d-inline">
-                                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to cancel this subscription?')">Cancel</button>
+                                        {% if service.domain %}
+                                            {{ service.domain }}
+                                            {% if service.ssl_enabled %}
+                                                <i data-feather="lock" class="text-success" title="SSL Enabled"></i>
+                                            {% endif %}
+                                        {% else %}
+                                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#domainModal{{ service.id }}">
+                                                Configure Domain
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if service.last_backup_at %}
+                                            {{ service.last_backup_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                            No backups
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <form action="{{ url_for('service.create_backup', service_id=service.id) }}" method="POST" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-success" {% if not service.backup_enabled %}disabled{% endif %}>
+                                                    Backup Now
+                                                </button>
                                             </form>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="4">No active subscriptions</td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+                                            {% if service.domain %}
+                                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#domainModal{{ service.id }}">
+                                                Update Domain
+                                            </button>
+                                            {% endif %}
+                                        </div>
 
-        <div class="card mt-4">
-            <div class="card-body">
-                <h5 class="card-title">Deployed Services</h5>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Service</th>
-                                <th>Status</th>
-                                <th>Port</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if current_user.containers.count() > 0 %}
-                                {% for container in current_user.containers %}
-                                <tr>
-                                    <td>{{ container.service.name }}</td>
-                                    <td>
-                                        <span class="badge bg-{{ 'success' if container.status == 'running' else 'warning' }}" data-container-id="{{ container.id }}">
-                                            {{ container.status }}
-                                        </span>
-                                    </td>
-                                    <td>{{ container.port }}</td>
-                                    <td>
-                                        {% if container.status == 'running' %}
-                                        <form action="{{ url_for('service.stop_container', container_id=container.id) }}" method="POST" class="d-inline">
-                                            <button type="submit" class="btn btn-warning btn-sm">Stop</button>
-                                        </form>
-                                        {% endif %}
-                                        <form action="{{ url_for('service.remove_container', container_id=container.id) }}" method="POST" class="d-inline">
-                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to remove this container?')">Remove</button>
-                                        </form>
+                                        <!-- Domain Configuration Modal -->
+                                        <div class="modal fade" id="domainModal{{ service.id }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Configure Domain for {{ service.name }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <form action="{{ url_for('service.update_domain', service_id=service.id) }}" method="POST">
+                                                            <div class="mb-3">
+                                                                <label for="domain" class="form-label">Domain Name</label>
+                                                                <input type="text" class="form-control" id="domain" name="domain" value="{{ service.domain }}" required>
+                                                            </div>
+                                                            <div class="mb-3 form-check">
+                                                                <input type="checkbox" class="form-check-input" id="enable_ssl" name="enable_ssl" {% if service.ssl_enabled %}checked{% endif %}>
+                                                                <label class="form-check-label" for="enable_ssl">Enable SSL</label>
+                                                            </div>
+                                                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="4">No deployed services</td>
+                                    <td colspan="5" class="text-center">No active services</td>
                                 </tr>
                             {% endif %}
                         </tbody>
