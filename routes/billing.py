@@ -2,14 +2,25 @@ from flask import Blueprint, request, redirect, url_for, flash, render_template,
 from flask_login import login_required, current_user
 from models import db, Service, Subscription, BillingInfo
 from utils.stripe_utils import (
+    init_stripe,
     create_stripe_customer,
     create_subscription,
     cancel_subscription,
     update_payment_method
 )
+from datetime import datetime
 import logging
 
 billing = Blueprint('billing', __name__)
+logger = logging.getLogger(__name__)
+
+@billing.before_request
+def check_stripe_status():
+    """Verify Stripe is properly initialized before handling any billing routes"""
+    stripe_status, message = init_stripe()
+    if not stripe_status and request.endpoint != 'billing.setup_billing':
+        flash('Payment system is currently unavailable. Please try again later.', 'danger')
+        return redirect(url_for('service.dashboard'))
 
 @billing.route('/billing/setup', methods=['GET', 'POST'])
 @login_required
@@ -17,6 +28,10 @@ def setup_billing():
     if request.method == 'POST':
         try:
             payment_method_id = request.form.get('payment_method_id')
+            if not payment_method_id:
+                flash('Invalid payment information provided.', 'danger')
+                return redirect(url_for('billing.setup_billing'))
+
             if not current_user.stripe_customer_id:
                 customer_id = create_stripe_customer(current_user)
                 if customer_id:
@@ -45,10 +60,10 @@ def setup_billing():
                 flash('Failed to update payment method', 'danger')
 
         except Exception as e:
-            logging.error(f"Error setting up billing: {str(e)}")
+            logger.error(f"Error setting up billing: {str(e)}")
             flash('An error occurred while setting up billing', 'danger')
 
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('service.dashboard'))
 
     return render_template('billing/setup.html')
 
@@ -69,7 +84,8 @@ def subscribe_service(service_id):
                 user=current_user,
                 service=service,
                 stripe_subscription_id=subscription_data['subscription_id'],
-                status=subscription_data['status']
+                status=subscription_data['status'],
+                current_period_end=datetime.utcnow()  # This should be updated from Stripe webhook
             )
             db.session.add(subscription)
             db.session.commit()
@@ -77,19 +93,19 @@ def subscribe_service(service_id):
         else:
             flash('Failed to create subscription', 'danger')
     except Exception as e:
-        logging.error(f"Error creating subscription: {str(e)}")
+        logger.error(f"Error creating subscription: {str(e)}")
         flash('An error occurred while processing your subscription', 'danger')
 
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('service.dashboard'))
 
 @billing.route('/billing/cancel/<int:subscription_id>', methods=['POST'])
 @login_required
 def cancel_service_subscription(subscription_id):
     subscription = Subscription.query.get_or_404(subscription_id)
-    
+
     if subscription.user_id != current_user.id:
         flash('Unauthorized action', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('service.dashboard'))
 
     try:
         if cancel_subscription(subscription.stripe_subscription_id):
@@ -100,7 +116,7 @@ def cancel_service_subscription(subscription_id):
         else:
             flash('Failed to cancel subscription', 'danger')
     except Exception as e:
-        logging.error(f"Error cancelling subscription: {str(e)}")
+        logger.error(f"Error cancelling subscription: {str(e)}")
         flash('An error occurred while cancelling your subscription', 'danger')
 
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('service.dashboard'))
