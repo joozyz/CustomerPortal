@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from sqlalchemy.orm import DeclarativeBase
@@ -37,6 +37,18 @@ if not stripe_secret_key:
 
 app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
 app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
+
+# Add request logging
+@app.before_request
+def log_request_info():
+    logger.debug('Request Headers: %s', dict(request.headers))
+    logger.debug('Request URL: %s', request.url)
+
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    logger.info('Health check endpoint called')
+    return 'OK', 200
 
 # Configure Login Manager
 login_manager.init_app(app)
