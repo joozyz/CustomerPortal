@@ -20,4 +20,5 @@ dependencies = [
     "stripe>=11.5.0",
     "pyotp>=2.9.0",
     "qrcode>=8.0",
+    "twilio>=9.4.6",
 ]
