@@ -32,8 +32,15 @@ def dashboard():
 def service_catalog():
     """Display available services"""
     try:
+        logger.debug("Fetching services for catalog")
         services = Service.query.all()
-        return render_template('services/catalog.html', services=services)
+        logger.debug(f"Found {len(services)} services")
+
+        return render_template(
+            'services/catalog.html',
+            services=services,
+            current_user=current_user
+        )
     except Exception as e:
         logger.error(f"Error loading service catalog: {str(e)}")
         flash('An error occurred while loading the service catalog', 'danger')
