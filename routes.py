@@ -3,15 +3,11 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db, login_manager, limiter
 from models import User, Service, CustomerProfile, BillingInfo, Container
 from utils import admin_required, podman_manager
+import logging
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
-@app.route('/')
-def index():
-    services = Service.query.all()
-    return render_template('index.html', services=services)
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -20,11 +16,27 @@ def login():
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        user = User.query.filter_by(email=request.form.get('email')).first()
-        if user and user.check_password(request.form.get('password')):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        flash('Invalid email or password', 'danger')
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        if not email or not password:
+            flash('Please provide both email and password', 'danger')
+            return render_template('login.html')
+
+        try:
+            user = User.query.filter_by(email=email).first()
+            if user and user.check_password(password):
+                login_user(user)
+                logging.info(f"User {email} logged in successfully")
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                logging.warning(f"Failed login attempt for email: {email}")
+                flash('Invalid email or password', 'danger')
+        except Exception as e:
+            logging.error(f"Login error: {str(e)}")
+            flash('An error occurred during login', 'danger')
+
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -186,3 +198,8 @@ def container_status(container_id):
 
     status = podman_manager.get_container_status(container.container_id)
     return jsonify({'status': status})
+
+@app.route('/')
+def index():
+    services = Service.query.all()
+    return render_template('index.html', services=services)
