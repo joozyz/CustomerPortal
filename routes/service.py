@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, jsonify, request
 from flask_login import login_required, current_user
 from app import db
 from models import Service, Container, Subscription
 from utils.podman import podman_manager
+from utils.backup_manager import backup_manager  # Fixed import path
 from datetime import datetime
 import logging
 import os
@@ -57,6 +58,79 @@ def deploy_wordpress():
         flash('An error occurred while deploying WordPress', 'danger')
         return redirect(url_for('service.dashboard'))
 
+@service.route('/services/<int:service_id>/backup', methods=['POST'])
+@login_required
+def create_backup(service_id):
+    """Create a backup for a service"""
+    try:
+        service = Service.query.get_or_404(service_id)
+
+        # Ensure the service belongs to the current user
+        container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=service_id,
+            status='running'
+        ).first()
+
+        if not container:
+            flash('No active container found for this service', 'danger')
+            return redirect(url_for('service.dashboard'))
+
+        # Create backup
+        success, message = backup_manager.create_backup(service, container)
+
+        if success:
+            flash('Backup created successfully', 'success')
+            db.session.commit()  # Save the updated last_backup_at timestamp
+        else:
+            flash(f'Backup failed: {message}', 'danger')
+
+        return redirect(url_for('service.dashboard'))
+
+    except Exception as e:
+        logger.error(f"Error creating backup: {str(e)}")
+        flash('An error occurred while creating the backup', 'danger')
+        return redirect(url_for('service.dashboard'))
+
+@service.route('/services/<int:service_id>/domain', methods=['POST'])
+@login_required
+def update_domain(service_id):
+    """Update domain settings for a service"""
+    try:
+        service = Service.query.get_or_404(service_id)
+
+        # Ensure the service belongs to the current user
+        container = Container.query.filter_by(
+            user_id=current_user.id,
+            service_id=service_id
+        ).first()
+
+        if not container:
+            flash('No container found for this service', 'danger')
+            return redirect(url_for('service.dashboard'))
+
+        domain = request.form.get('domain')
+        enable_ssl = request.form.get('enable_ssl', 'false') == 'true'
+
+        if domain:
+            service.domain = domain
+            service.domain_status = 'pending'
+            if enable_ssl:
+                service.ssl_enabled = True
+                # SSL setup would be handled by a background task
+
+            db.session.commit()
+            flash('Domain settings updated successfully', 'success')
+        else:
+            flash('Domain name is required', 'danger')
+
+        return redirect(url_for('service.dashboard'))
+
+    except Exception as e:
+        logger.error(f"Error updating domain settings: {str(e)}")
+        flash('An error occurred while updating domain settings', 'danger')
+        return redirect(url_for('service.dashboard'))
+
 @service.route('/dashboard')
 @login_required
 def dashboard():
@@ -74,12 +148,19 @@ def dashboard():
             user_id=current_user.id
         ).all()
 
+        # Get services with their latest backup info
+        services = Service.query.join(Container).filter(
+            Container.user_id == current_user.id
+        ).all()
+
         return render_template('dashboard.html',
-                             stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
-                             current_user=current_user)
+                             services=services,
+                             active_subscriptions=active_subscriptions,
+                             active_containers=active_containers,
+                             stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
     except Exception as e:
         logger.error(f"Error loading dashboard: {str(e)}")
-        flash('An error occurred while loading the dashboard. Please try again.', 'danger')
+        flash('An error occurred while loading the dashboard', 'danger')
         return redirect(url_for('main.index'))
 
 @service.route('/services/catalog')

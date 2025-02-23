@@ -80,15 +80,36 @@ class Service(db.Model):
     container_image = db.Column(db.String(200))
     container_port = db.Column(db.Integer)
     environment_vars = db.Column(db.JSON)
-    # New fields for service management
+    # Resource quotas
     cpu_quota = db.Column(db.Float, default=1.0)  # CPU cores
     memory_quota = db.Column(db.Integer, default=512)  # MB
     storage_quota = db.Column(db.Integer, default=1024)  # MB
-    backup_enabled = db.Column(db.Boolean, default=False)
+    # Domain management
+    domain = db.Column(db.String(255))  # Primary domain
+    domain_status = db.Column(db.String(20), default='pending')  # pending, active, error
+    ssl_enabled = db.Column(db.Boolean, default=False)
+    ssl_expiry = db.Column(db.DateTime)
+    # Backup configuration
+    backup_enabled = db.Column(db.Boolean, default=True)
+    backup_frequency = db.Column(db.String(20), default='daily')  # daily, weekly, monthly
     backup_retention_days = db.Column(db.Integer, default=7)
+    last_backup_at = db.Column(db.DateTime)
+    backup_storage_path = db.Column(db.String(255))
+    # Monitoring
     monitoring_enabled = db.Column(db.Boolean, default=True)
+    alert_email = db.Column(db.String(120))
+    alert_phone = db.Column(db.String(20))
     subscriptions = db.relationship('Subscription', backref='service', lazy='dynamic')
     containers = db.relationship('Container', backref='service', lazy='dynamic')
+
+    def initialize_backup_config(self):
+        """Initialize default backup configuration"""
+        if not self.backup_storage_path:
+            self.backup_storage_path = f"/backups/{self.name.lower()}"
+        if not self.backup_frequency:
+            self.backup_frequency = 'daily'
+        if not self.backup_retention_days:
+            self.backup_retention_days = 7
 
 class Container(db.Model):
     id = db.Column(db.Integer, primary_key=True)
