@@ -1,21 +1,37 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from models import Service, Container
-from utils.podman_manager import podman_manager
+from models import Service, Container, Subscription
 import logging
-from datetime import datetime
 import os
 
 service = Blueprint('service', __name__)
+logger = logging.getLogger(__name__)
 
 @service.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.is_admin:
-        return redirect(url_for('admin.admin_dashboard'))
-    return render_template('dashboard.html', 
-                         stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
+    try:
+        if current_user.is_admin:
+            return redirect(url_for('admin.admin_dashboard'))
+
+        # Get user's active services and containers
+        active_subscriptions = Subscription.query.filter_by(
+            user_id=current_user.id,
+            status='active'
+        ).all()
+
+        active_containers = Container.query.filter_by(
+            user_id=current_user.id
+        ).all()
+
+        return render_template('dashboard.html',
+                             stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'),
+                             current_user=current_user)
+    except Exception as e:
+        logger.error(f"Error loading dashboard: {str(e)}")
+        flash('An error occurred while loading the dashboard. Please try again.', 'danger')
+        return redirect(url_for('main.index'))
 
 @service.route('/services/catalog')
 def service_catalog():
