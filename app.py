@@ -19,10 +19,10 @@ login_manager = LoginManager()
 
 # Create Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")  # Default for development
+app.secret_key = os.environ.get("SESSION_SECRET")
 
-# Configure SQLAlchemy
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///app.db")
+# Configure SQLAlchemy with PostgreSQL
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
