@@ -11,39 +11,70 @@ class PodmanManager:
         try:
             self.connect()
         except Exception as e:
-            self.logger.warning(f"Podman initialization failed (this is okay if Podman is not required): {str(e)}")
+            self.logger.error(f"Podman initialization failed: {str(e)}")
+            # Try to get more detailed system information
+            try:
+                import subprocess
+                result = subprocess.run(['podman', 'info'], capture_output=True, text=True)
+                self.logger.info(f"Podman system info: {result.stdout}")
+            except Exception as e2:
+                self.logger.error(f"Failed to get Podman info: {str(e2)}")
 
     def connect(self) -> bool:
         """Initialize connection to Podman"""
         try:
-            # Try rootless connection first
-            uri = 'unix:///run/user/1000/podman/podman.sock'
-            self.client = podman.PodmanClient(uri=uri)
-            # Test connection by listing containers
-            self.client.containers.list()
-            self.logger.info("Successfully connected to Podman (rootless)")
+            # First try XDG_RUNTIME_DIR socket
+            xdg_runtime = os.environ.get('XDG_RUNTIME_DIR', '')
+            if xdg_runtime:
+                uri = f'unix://{xdg_runtime}/podman/podman.sock'
+                self.logger.info(f"Trying Podman socket at: {uri}")
+                try:
+                    self.client = podman.PodmanClient(base_url=uri)
+                    # Test connection
+                    self.client.ping()
+                    self.logger.info("Successfully connected to Podman via XDG_RUNTIME_DIR")
+                    return True
+                except Exception as e:
+                    self.logger.warning(f"Failed to connect via XDG_RUNTIME_DIR: {str(e)}")
+
+            # Try default system socket
+            uri = 'unix:///run/podman/podman.sock'
+            self.logger.info(f"Trying default Podman socket at: {uri}")
+            self.client = podman.PodmanClient(base_url=uri)
+            # Test connection
+            self.client.ping()
+            self.logger.info("Successfully connected to Podman via system socket")
             return True
+
         except Exception as e:
-            self.logger.warning(f"Failed to connect to Podman (non-critical): {str(e)}")
+            self.logger.error(f"Failed to connect to Podman: {str(e)}")
             return False
 
     def check_system(self) -> Tuple[bool, str]:
         """Check Podman system status and return (is_healthy, status_message)"""
         try:
             if not self.client:
-                return False, "Podman service unavailable"
+                return False, "Podman service unavailable - no client connection"
 
-            # Test connection by listing images
-            self.client.images.list()
+            # Test connection by pinging
+            try:
+                self.client.ping()
+            except Exception as e:
+                self.logger.error(f"Podman ping failed: {str(e)}")
+                return False, "Podman service unavailable - ping failed"
 
             # Get Podman version info
-            version = self.client.version()
+            try:
+                version = self.client.version()
+                return True, f"Podman {version['Version']} running"
+            except Exception as e:
+                self.logger.error(f"Failed to get Podman version: {str(e)}")
+                return False, "Podman service unavailable - version check failed"
 
-            return True, f"Podman {version['Version']} running"
         except Exception as e:
             error_msg = str(e)
-            self.logger.warning(f"Podman system check failed (non-critical): {error_msg}")
-            return False, f"Podman service unavailable"
+            self.logger.error(f"Podman system check failed: {error_msg}")
+            return False, f"Podman service unavailable - {error_msg}"
 
     def deploy_lemp_stack(self, service: Service, user_id: int) -> Optional[Container]:
         if not self.check_system()[0]:
