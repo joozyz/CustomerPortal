@@ -13,7 +13,7 @@ auth = Blueprint('auth', __name__)
 @limiter.limit("5 per minute")
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('service.dashboard'))
 
     if request.method == 'POST':
         email = request.form.get('email')
@@ -39,7 +39,7 @@ def login():
                 login_user(user)
                 logging.info(f"User {email} logged in successfully")
                 flash('Logged in successfully!', 'success')
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('service.dashboard'))
             else:
                 logging.warning(f"Failed login attempt for email: {email}")
                 flash('Invalid email or password', 'danger')
@@ -53,12 +53,12 @@ def login():
 @limiter.limit("3 per hour")
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('service.dashboard'))
 
     if request.method == 'POST':
         if User.query.filter_by(email=request.form.get('email')).first():
             flash('Email already registered', 'danger')
-            return redirect(url_for('register'))
+            return redirect(url_for('auth.register'))
 
         user = User(
             username=request.form.get('username'),
@@ -100,7 +100,7 @@ def setup_2fa():
             current_user.two_factor_enabled = True
             db.session.commit()
             flash('Two-factor authentication enabled successfully', 'success')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('service.dashboard'))
         else:
             flash('Invalid verification code', 'danger')
 
@@ -124,7 +124,7 @@ def disable_2fa():
     current_user.disable_2fa()
     db.session.commit()
     flash('Two-factor authentication disabled', 'success')
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('service.dashboard'))
 
 @auth.route('/2fa/verify', methods=['GET', 'POST'])
 def verify_2fa():
@@ -139,7 +139,7 @@ def verify_2fa():
             login_user(user)
             session.pop('email_2fa', None)
             flash('Logged in successfully!', 'success')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('service.dashboard'))
         else:
             flash('Invalid verification code', 'danger')
 
