@@ -1,0 +1,65 @@
+Pasted--Python-Web-App-Prompt-Secure-and-Comprehensive-Cloud-Service-Management-Platform-This-prompt-ou-1740343194678.txt## Python Web App Prompt: Secure and Comprehensive Cloud Service Management Platform
+
+This prompt outlines the development of a secure and feature-rich customer portal for managing hosting and cloud services, built with Python and deployed via Node.js/Nginx.
+
+**Core Features:**
+
+* **Customer Management:**
+    * Secure user registration and login (2FA, rate limiting).
+    * Stripe integration for customer data and billing.
+    * Customer profiles with service history, quotas, and billing information.
+* **Service Management:**
+    * Service catalog with detailed descriptions and pricing.
+    * Automated deployment of services using Podman Compose stacks (rootless containers).
+    * Service monitoring, backup, and alteration capabilities.
+    * Quota management and usage-based billing.
+    * SSL/TLS management (Let's Encrypt integration, manual certificate upload).
+    * Site migration functionality (FTP/SFTP/SSH).
+    * Backup as a service with automated scheduling and restore options.
+    * Mail hosting account creation via API integration with mail servers.
+* **Infrastructure Management (Admin Backend):**
+    * Secure admin dashboard (/dashboard).
+    * Linux node management (add, remove, monitor).
+    * Service configuration and management.
+    * Quota and billing management.
+    * Branding customization.
+    * Interactive quizzes/guides for service configuration during ordering.
+    * Comprehensive monitoring and logging (SIEM integration).
+    * Exoscale resource usage calculation and billing integration.
+    * SMTP mailer configuration (user-configurable SMTP settings).
+    * API integrations (Stripe, Exoscale, cloud.autodns.com, mail server).
+    * Domain and mailbox management tools.
+* **Security:**
+    * NIST and PCI-DSS compliance.
+    * Data at rest encryption (database, file system, backups).
+    * WAF (Web Application Firewall) for web attack protection.
+    * Intrusion detection and prevention systems (focus on WAF, SIEM, log analysis).
+    * Secure API design with access control.
+    * Regular security audits and penetration testing.
+
+**User Experience:**
+
+* **Apple-like frontend:** Clean, modern, and intuitive design with customizable styling.
+* **Customer view:** Service overview, billing information, support, domain management.
+* **Admin dashboard:** 360-degree system overview, customer management, infrastructure management, reporting, backup/restore, service configuration, quiz/guide builder.
+
+**Technology Stack:**
+
+* **Backend:** Python (FastAPI), SQLAlchemy, Podman SDK, Stripe API, security libraries.
+* **Database:** PostgreSQL.
+* **Web Server:** Node.js/Nginx.
+* **Containerization:** Podman and Podman Compose.
+* **Frontend:** React or Vue.js, Tailwind CSS.
+* **Billing:** Stripe.
+* **Cloud Provider:** Exoscale.
+* **Domain Management:** cloud.autodns.com API.
+* **Message Queue:** RabbitMQ or Kafka.
+
+**Additional Requirements:**
+
+* **Modular design** for easy maintenance and expansion.
+* **Scalable architecture** to handle increasing user loads.
+* **Comprehensive testing** (unit, integration, end-to-end).
+* **Detailed documentation** for API endpoints and system configuration.
+
+This prompt provides a comprehensive overview of the requirements for a secure and user-friendly cloud service management platform. Remember to prioritize security, scalability, and user experience throughout the development process.
