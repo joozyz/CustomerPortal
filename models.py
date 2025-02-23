@@ -2,6 +2,7 @@ from datetime import datetime
 from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+import pyotp
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -11,6 +12,9 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     stripe_customer_id = db.Column(db.String(120), unique=True)
+    # 2FA fields
+    two_factor_secret = db.Column(db.String(32))
+    two_factor_enabled = db.Column(db.Boolean, default=False)
     profile = db.relationship('CustomerProfile', backref='user', uselist=False)
     containers = db.relationship('Container', backref='user', lazy='dynamic')
     subscriptions = db.relationship('Subscription', backref='user', lazy='dynamic')
@@ -20,6 +24,34 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def get_2fa_uri(self):
+        """Generate the 2FA provisioning URI"""
+        if self.two_factor_secret:
+            return pyotp.totp.TOTP(self.two_factor_secret).provisioning_uri(
+                name=self.email,
+                issuer_name="Cloud Service Management"
+            )
+        return None
+
+    def verify_2fa(self, code):
+        """Verify a 2FA code"""
+        if not self.two_factor_enabled or not self.two_factor_secret:
+            return True
+        totp = pyotp.TOTP(self.two_factor_secret)
+        return totp.verify(code)
+
+    def enable_2fa(self):
+        """Enable 2FA for the user"""
+        if not self.two_factor_secret:
+            self.two_factor_secret = pyotp.random_base32()
+        self.two_factor_enabled = True
+        return self.get_2fa_uri()
+
+    def disable_2fa(self):
+        """Disable 2FA for the user"""
+        self.two_factor_enabled = False
+        self.two_factor_secret = None
 
 class CustomerProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
