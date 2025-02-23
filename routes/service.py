@@ -5,6 +5,7 @@ from models import Service, Container
 from utils.podman_manager import podman_manager
 import logging
 from datetime import datetime
+import os
 
 service = Blueprint('service', __name__)
 
@@ -13,7 +14,8 @@ service = Blueprint('service', __name__)
 def dashboard():
     if current_user.is_admin:
         return redirect(url_for('admin.admin_dashboard'))
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', 
+                         stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
 
 @service.route('/services/catalog')
 def service_catalog():
