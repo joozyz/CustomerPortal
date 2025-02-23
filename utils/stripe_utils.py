@@ -31,7 +31,7 @@ def create_stripe_customer(user: User) -> Optional[str]:
         customer = stripe.Customer.create(
             email=user.email,
             name=user.username,
-            metadata={'user_id': user.id}
+            metadata={'user_id': str(user.id)}
         )
         logger.info(f"Created Stripe customer for user {user.id}")
         return customer.id
@@ -48,7 +48,7 @@ def create_stripe_product(service: Service) -> Optional[Dict[str, str]]:
         product = stripe.Product.create(
             name=service.name,
             description=service.description,
-            metadata={'service_id': service.id}
+            metadata={'service_id': str(service.id)}
         )
 
         price = stripe.Price.create(
@@ -74,16 +74,13 @@ def create_subscription(user: User, service: Service, payment_method_id: str) ->
     """Create a Stripe subscription for a user"""
     try:
         # Attach payment method to customer
-        payment_method = stripe.PaymentMethod.attach(
-            payment_method_id,
-            customer=user.stripe_customer_id,
-        )
+        stripe.PaymentMethod.attach(payment_method_id, customer=user.stripe_customer_id)
 
         # Set as default payment method
         stripe.Customer.modify(
             user.stripe_customer_id,
             invoice_settings={
-                'default_payment_method': payment_method.id
+                'default_payment_method': payment_method_id
             }
         )
 
@@ -123,17 +120,22 @@ def cancel_subscription(subscription_id: str) -> bool:
 def update_payment_method(user: User, payment_method_id: str) -> Optional[Dict[str, Any]]:
     """Update payment method for a user"""
     try:
-        payment_method = stripe.PaymentMethod.attach(
+        # Attach the payment method to the customer
+        stripe.PaymentMethod.attach(
             payment_method_id,
-            customer=user.stripe_customer_id,
+            customer=user.stripe_customer_id
         )
 
+        # Set as default payment method
         stripe.Customer.modify(
             user.stripe_customer_id,
             invoice_settings={
-                'default_payment_method': payment_method.id
+                'default_payment_method': payment_method_id
             }
         )
+
+        # Get payment method details
+        payment_method = stripe.PaymentMethod.retrieve(payment_method_id)
 
         logger.info(f"Updated payment method for user {user.id}")
         return {
