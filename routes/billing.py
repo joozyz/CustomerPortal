@@ -24,17 +24,24 @@ def check_stripe_status():
         flash('Payment system is currently unavailable. Please try again later.', 'danger')
         return redirect(url_for('service.dashboard'))
 
+@billing.route('/billing/setup', methods=['GET'])
+@login_required
+def setup_billing():
+    """Display the billing setup page"""
+    return render_template('billing/setup.html', 
+                         stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
+
 @billing.route('/billing/create-setup-session', methods=['POST'])
 @login_required
 def create_setup_session():
+    """Create a Stripe setup session for payment method configuration"""
     try:
         if not current_user.stripe_customer_id:
             # Create a new Stripe customer
-            customer = stripe.Customer.create(
-                email=current_user.email,
-                metadata={'user_id': str(current_user.id)}
-            )
-            current_user.stripe_customer_id = customer.id
+            customer = create_stripe_customer(current_user)
+            if not customer:
+                raise Exception("Failed to create Stripe customer")
+            current_user.stripe_customer_id = customer
             db.session.commit()
 
         # Create Stripe Checkout session for setup
@@ -49,17 +56,19 @@ def create_setup_session():
         return jsonify({'id': session.id})
     except Exception as e:
         logger.error(f"Error creating setup session: {str(e)}")
-        return jsonify({'error': 'Failed to create setup session'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @billing.route('/billing/setup/success')
 @login_required
 def setup_success():
+    """Handle successful payment method setup"""
     flash('Payment method added successfully!', 'success')
     return redirect(url_for('service.dashboard'))
 
 @billing.route('/billing/setup/cancelled')
 @login_required
 def setup_cancelled():
+    """Handle cancelled payment method setup"""
     flash('Payment setup was cancelled.', 'warning')
     return redirect(url_for('service.dashboard'))
 
