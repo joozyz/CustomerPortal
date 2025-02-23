@@ -4,5 +4,10 @@ from app import app
 
 # Import route modules
 from .billing import billing
+from .auth import auth
+from .main import main
+from .admin import admin
+from .service import service
 
-__all__ = ['billing']
+# Export all blueprints
+__all__ = ['billing', 'auth', 'main', 'admin', 'service']

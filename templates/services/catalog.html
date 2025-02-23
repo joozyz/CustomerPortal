@@ -14,7 +14,7 @@
         <div class="card h-100">
             <div class="card-body">
                 {% if current_user.is_admin %}
-                <form action="{{ url_for('update_service', service_id=service.id) }}" method="POST" class="service-edit-form">
+                <form action="{{ url_for('service.update_service', service_id=service.id) }}" method="POST" class="service-edit-form">
                     <input type="text" class="form-control mb-2" name="name" value="{{ service.name }}" required>
                     <textarea class="form-control mb-2" name="description" rows="3" required>{{ service.description }}</textarea>
                     <div class="input-group mb-2">
@@ -47,7 +47,7 @@
                         <a href="{{ url_for('billing.setup_billing') }}" class="btn btn-primary">Setup Billing First</a>
                     {% else %}
                         {% if service.container_image %}
-                            <form action="{{ url_for('deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
+                            <form action="{{ url_for('service.deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
                                 <button type="submit" class="btn btn-success">Deploy Service</button>
                             </form>
                         {% else %}
@@ -57,7 +57,7 @@
                         {% endif %}
                     {% endif %}
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-primary">Login to Subscribe</a>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Login to Subscribe</a>
                 {% endif %}
             </div>
         </div>

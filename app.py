@@ -40,7 +40,7 @@ app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", 
 
 # Configure Login Manager
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
 
 # Configure rate limiter
@@ -70,11 +70,18 @@ with app.app_context():
     try:
         # Import and register blueprints
         from routes.billing import billing
+        from routes.auth import auth
+        from routes.main import main
+        from routes.service import service
+        from routes.admin import admin
+
         app.register_blueprint(billing)
+        app.register_blueprint(auth)
+        app.register_blueprint(main)
+        app.register_blueprint(service)
+        app.register_blueprint(admin)
+
         logger.info("Blueprints registered successfully")
     except Exception as e:
         logger.error(f"Error registering blueprints: {str(e)}")
         raise
-
-    # Import routes after registering blueprints
-    from routes import *
