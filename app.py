@@ -67,21 +67,6 @@ with app.app_context():
     db.create_all()
     logger.info("Database tables created successfully")
 
-    try:
-        # Import and register blueprints
-        from routes.billing import billing
-        from routes.auth import auth
-        from routes.main import main
-        from routes.service import service
-        from routes.admin import admin
-
-        app.register_blueprint(billing)
-        app.register_blueprint(auth)
-        app.register_blueprint(main)
-        app.register_blueprint(service)
-        app.register_blueprint(admin)
-
-        logger.info("Blueprints registered successfully")
-    except Exception as e:
-        logger.error(f"Error registering blueprints: {str(e)}")
-        raise
+    # Import routes package which will register all blueprints
+    import routes
+    logger.info("Routes package imported successfully")

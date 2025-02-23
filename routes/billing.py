@@ -2,7 +2,6 @@ from flask import Blueprint, request, redirect, url_for, flash, render_template,
 from flask_login import login_required, current_user
 from models import db, Service, Subscription, BillingInfo
 from utils.stripe_utils import (
-    init_stripe,
     create_stripe_customer,
     create_subscription,
     cancel_subscription,
@@ -16,15 +15,7 @@ import os
 billing = Blueprint('billing', __name__)
 logger = logging.getLogger(__name__)
 
-@billing.before_request
-def check_stripe_status():
-    """Verify Stripe is properly initialized before handling any billing routes"""
-    stripe_status, message = init_stripe()
-    if not stripe_status and request.endpoint != 'billing.setup_billing':
-        flash('Payment system is currently unavailable. Please try again later.', 'danger')
-        return redirect(url_for('service.dashboard'))
-
-@billing.route('/billing/setup', methods=['GET', 'POST'])
+@billing.route('/setup', methods=['GET', 'POST'])
 @login_required
 def setup_billing():
     """Handle billing setup and create Stripe checkout session"""
@@ -58,14 +49,14 @@ def setup_billing():
     return render_template('billing/setup.html',
                          stripe_publishable_key=os.environ.get('STRIPE_PUBLISHABLE_KEY'))
 
-@billing.route('/billing/setup/success')
+@billing.route('/setup/success')
 @login_required
 def setup_success():
     """Handle successful payment method setup"""
     flash('Payment method added successfully!', 'success')
     return redirect(url_for('service.dashboard'))
 
-@billing.route('/billing/setup/cancelled')
+@billing.route('/setup/cancelled')
 @login_required
 def setup_cancelled():
     """Handle cancelled payment method setup"""
