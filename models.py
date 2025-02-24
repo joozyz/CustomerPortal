@@ -137,3 +137,52 @@ class Subscription(db.Model):
     current_period_end = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     cancelled_at = db.Column(db.DateTime)
+
+class SystemActivity(db.Model):
+    """Model for tracking admin and system activities"""
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    action = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship('User', backref=db.backref('activities', lazy='dynamic'))
+
+    @classmethod
+    def log_activity(cls, action, description, user=None):
+        """Create a new activity log entry"""
+        activity = cls(
+            action=action,
+            description=description,
+            user_id=user.id if user else None
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+class SystemAlert(db.Model):
+    """Model for system alerts and notifications"""
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    level = db.Column(db.String(20), default='info')  # info, warning, error, critical
+    resolved_at = db.Column(db.DateTime)
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    resolved_by = db.relationship('User', backref=db.backref('resolved_alerts', lazy='dynamic'))
+
+    @classmethod
+    def create_alert(cls, title, message, level='info'):
+        """Create a new system alert"""
+        alert = cls(
+            title=title,
+            message=message,
+            level=level
+        )
+        db.session.add(alert)
+        db.session.commit()
+        return alert
+
+    def resolve(self, user):
+        """Mark an alert as resolved"""
+        self.resolved_at = datetime.utcnow()
+        self.resolved_by = user
+        db.session.commit()
