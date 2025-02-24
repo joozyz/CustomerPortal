@@ -15,6 +15,45 @@ class PodmanManager:
             logger.error(f"Failed to connect to Podman: {str(e)}")
             self.client = None
 
+    def create_container(self, name: str, image: str, environment: Dict[str, str] = None) -> Optional[Dict[str, Any]]:
+        """Create a new container"""
+        try:
+            if not self.client:
+                logger.error("Podman client not initialized")
+                return None
+
+            # Prepare container configuration
+            container_config = {
+                'name': name,
+                'image': image,
+                'environment': [f"{k}={v}" for k, v in (environment or {}).items()],
+                'detach': True
+            }
+
+            # Pull the image first
+            try:
+                self.client.images.pull(image)
+            except Exception as e:
+                logger.error(f"Failed to pull image {image}: {str(e)}")
+                return None
+
+            # Create and start the container
+            container = self.client.containers.create(**container_config)
+            container.start()
+
+            # Get container info
+            info = container.inspect()
+            return {
+                'Id': info['Id'],
+                'Name': info['Name'],
+                'Status': info['State']['Status'],
+                'Created': info['Created']
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to create container: {str(e)}")
+            return None
+
     def check_system(self) -> Tuple[bool, str]:
         """Check if Podman system is available and running"""
         try:
@@ -143,26 +182,14 @@ class PodmanManager:
             logger.error(f"Failed to deploy service: {str(e)}")
             return None
 
-    def get_container_status(self, container_id: str) -> Optional[Dict[str, Any]]:
-        """Get current status and metrics of a container"""
+    def get_container_status(self, container_id: str) -> Optional[str]:
+        """Get container status"""
         try:
             if not self.client:
                 return None
 
             container = self.client.containers.get(container_id)
-            container_info = container.inspect()
-
-            # Update container metrics
-            stats = container.stats(stream=False)
-            cpu_stats = stats['cpu_stats']
-            memory_stats = stats['memory_stats']
-
-            return {
-                'status': container_info['State']['Status'],
-                'cpu_usage': cpu_stats['cpu_usage']['total_usage'] / cpu_stats['system_cpu_usage'],
-                'memory_usage': memory_stats['usage'] / (1024 * 1024),  # Convert to MB
-                'uptime': container_info['State']['StartedAt']
-            }
+            return container.status
 
         except Exception as e:
             logger.error(f"Failed to get container status: {str(e)}")
