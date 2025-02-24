@@ -14,6 +14,15 @@ logger = logging.getLogger(__name__)
 admin = Blueprint('admin', __name__, 
                  template_folder='../templates/admin')
 
+@admin.before_request
+def check_admin():
+    if not current_user.is_authenticated:
+        flash('Please log in first.', 'warning')
+        return redirect(url_for('auth.login'))
+    if not current_user.is_admin:
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('main.index'))
+
 @admin.route('/')
 @admin.route('/dashboard')
 @login_required
