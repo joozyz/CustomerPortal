@@ -30,98 +30,128 @@ def check_admin():
 def admin_dashboard():
     try:
         # Get basic metrics
-        total_users = User.query.count()
-        active_services = Service.query.filter_by(is_active=True).count()
-        total_containers = Container.query.count()
+        metrics = get_system_metrics()
 
-        # Get recent activities with proper error handling
-        try:
-            recent_activities = SystemActivity.query.order_by(
-                SystemActivity.timestamp.desc()
-            ).limit(5).all()
-        except Exception as e:
-            logger.error(f"Error fetching activities: {str(e)}")
-            recent_activities = []
-
-        # Get system alerts with proper error handling
-        try:
-            system_alerts = SystemAlert.query.filter(
-                SystemAlert.resolved_at.is_(None)
-            ).order_by(SystemAlert.timestamp.desc()).all()
-        except Exception as e:
-            logger.error(f"Error fetching alerts: {str(e)}")
-            system_alerts = []
-
-        # Generate chart data for the last 7 days with proper error handling
-        try:
-            labels = []
-            users_data = []
-            services_data = []
-
-            for i in range(7, 0, -1):
-                date = datetime.utcnow() - timedelta(days=i)
-                labels.append(date.strftime('%Y-%m-%d'))
-
-                users_count = User.query.filter(
-                    User.created_at <= date
-                ).count()
-                users_data.append(users_count)
-
-                services_count = Container.query.filter(
-                    Container.status == 'running',
-                    Container.created_at <= date
-                ).count()
-                services_data.append(services_count)
-
-            chart_data = {
-                'labels': labels,
-                'users': users_data,
-                'services': services_data
-            }
-        except Exception as e:
-            logger.error(f"Error generating chart data: {str(e)}")
-            chart_data = {'labels': [], 'users': [], 'services': []}
-
-        # Get system health with proper error handling
-        try:
-            system_health = podman_manager.get_system_health()
-        except Exception as e:
-            logger.error(f"Error getting system health: {str(e)}")
-            system_health = 'unavailable'
-
-        # Compile system metrics
-        system_metrics = {
-            'total_users': total_users,
-            'active_services': active_services,
-            'total_containers': total_containers,
-            'system_health': system_health
+        # Get branding settings
+        branding = {
+            'default_theme': request.cookies.get('theme', 'light'),
+            'brand_color': request.cookies.get('brandColor', '#007AFF'),
+            'brand_name': request.cookies.get('brandName', 'Cloud Services')
         }
 
-        logger.info(f"Admin dashboard accessed by {current_user.username}")
-
-        # Log successful dashboard load
-        SystemActivity.log_activity(
-            action="admin_dashboard_access",
-            description=f"Admin dashboard accessed successfully",
-            user=current_user
-        )
-
         return render_template('admin/dashboard.html',
-                           metrics=system_metrics,
-                           recent_activities=recent_activities,
-                           system_alerts=system_alerts,
-                           chart_data=chart_data)
+                           metrics=metrics,
+                           recent_activities=get_recent_activities(),
+                           system_alerts=get_system_alerts(),
+                           chart_data=get_chart_data(),
+                           **branding)
 
     except Exception as e:
         logger.error(f"Error accessing admin dashboard: {str(e)}")
         flash('Error loading dashboard data. Please try again.', 'danger')
         return render_template('admin/dashboard.html', 
                              error=True,
-                             metrics={'total_users': 0, 'active_services': 0, 
-                                    'total_containers': 0, 'system_health': 'error'},
-                             recent_activities=[],
-                             system_alerts=[],
-                             chart_data={'labels': [], 'users': [], 'services': []})
+                             metrics=get_empty_metrics(),
+                             **get_default_branding())
+
+@admin.route('/branding', methods=['POST'])
+@login_required
+@admin_required
+def update_branding():
+    try:
+        theme = request.form.get('defaultTheme', 'light')
+        brand_color = request.form.get('brandColor', '#007AFF')
+        brand_name = request.form.get('brandName', 'Cloud Services')
+
+        response = jsonify({'success': True})
+
+        # Set cookies for branding settings
+        response.set_cookie('theme', theme, max_age=31536000)  # 1 year
+        response.set_cookie('brandColor', brand_color, max_age=31536000)
+        response.set_cookie('brandName', brand_name, max_age=31536000)
+
+        # Log the branding update
+        logger.info(f"Branding updated by admin {current_user.username}")
+        SystemActivity.log_activity(
+            action="branding_update",
+            description=f"Updated branding settings",
+            user=current_user
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error updating branding: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Helper functions
+def get_system_metrics():
+    return {
+        'total_users': User.query.count(),
+        'active_services': Service.query.filter_by(is_active=True).count(),
+        'total_containers': Container.query.count(),
+        'system_health': podman_manager.get_system_health()
+    }
+
+def get_empty_metrics():
+    return {
+        'total_users': 0,
+        'active_services': 0,
+        'total_containers': 0,
+        'system_health': 'error'
+    }
+
+def get_default_branding():
+    return {
+        'default_theme': 'light',
+        'brand_color': '#007AFF',
+        'brand_name': 'Cloud Services'
+    }
+
+def get_recent_activities():
+    try:
+        return SystemActivity.query.order_by(
+            SystemActivity.timestamp.desc()
+        ).limit(5).all()
+    except Exception:
+        return []
+
+def get_system_alerts():
+    try:
+        return SystemAlert.query.filter(
+            SystemAlert.resolved_at.is_(None)
+        ).order_by(SystemAlert.timestamp.desc()).all()
+    except Exception:
+        return []
+
+def get_chart_data():
+    try:
+        labels = []
+        users_data = []
+        services_data = []
+
+        for i in range(7, 0, -1):
+            date = datetime.utcnow() - timedelta(days=i)
+            labels.append(date.strftime('%Y-%m-%d'))
+
+            users_count = User.query.filter(
+                User.created_at <= date
+            ).count()
+            users_data.append(users_count)
+
+            services_count = Container.query.filter(
+                Container.status == 'running',
+                Container.created_at <= date
+            ).count()
+            services_data.append(services_count)
+
+        return {
+            'labels': labels,
+            'users': users_data,
+            'services': services_data
+        }
+    except Exception:
+        return {'labels': [], 'users': [], 'services': []}
 
 @admin.route('/users')
 @login_required

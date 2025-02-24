@@ -15,6 +15,76 @@
     </div>
 </div>
 
+<!-- Branding Settings -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Branding Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="brandingForm" action="{{ url_for('admin.update_branding') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Theme Mode</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="defaultTheme" id="lightTheme" value="light" {% if default_theme == 'light' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="lightTheme">
+                                <i data-feather="sun" class="me-2"></i>Light
+                            </label>
+
+                            <input type="radio" class="btn-check" name="defaultTheme" id="darkTheme" value="dark" {% if default_theme == 'dark' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="darkTheme">
+                                <i data-feather="moon" class="me-2"></i>Dark
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="brandColor" class="form-label">Brand Color</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <div class="color-preview" style="background-color: {{ brand_color }}"></div>
+                            </span>
+                            <input type="color" class="form-control form-control-color" id="brandColor" name="brandColor" value="{{ brand_color }}" title="Choose brand color">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="brandName" class="form-label">Brand Name</label>
+                        <input type="text" class="form-control" id="brandName" name="brandName" value="{{ brand_name }}" placeholder="Your Brand Name">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Branding Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Preview</h5>
+            </div>
+            <div class="card-body">
+                <div class="preview-container p-3" id="themePreview">
+                    <div class="preview-nav mb-3">
+                        <div class="preview-logo">
+                            <span id="previewBrandName">{{ brand_name }}</span>
+                        </div>
+                    </div>
+                    <div class="preview-content">
+                        <div class="preview-card">
+                            <h5>Sample Card</h5>
+                            <p>This is how your content will look.</p>
+                            <button class="btn btn-primary">Sample Button</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- System Metrics Overview -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -118,10 +188,100 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+{{ super() }}
+<style>
+    .color-preview {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid var(--border-color);
+    }
+
+    .preview-container {
+        border-radius: var(--border-radius);
+        background: var(--card-background);
+        color: var(--text-primary);
+        min-height: 300px;
+        transition: all 0.3s ease;
+    }
+
+    .preview-nav {
+        padding: 0.5rem;
+        background: var(--card-background);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .preview-logo {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .preview-card {
+        padding: 1rem;
+        background: var(--card-background);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+    }
+
+    .form-control-color {
+        width: 100px;
+    }
+</style>
+{% endblock %}
+
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{{ super() }}
 <script>
+function updatePreview() {
+    const brandColor = document.getElementById('brandColor').value;
+    const brandName = document.getElementById('brandName').value;
+    const theme = document.querySelector('input[name="defaultTheme"]:checked').value;
+
+    // Update preview
+    document.getElementById('previewBrandName').textContent = brandName;
+    document.documentElement.style.setProperty('--primary-color', brandColor);
+    document.documentElement.setAttribute('data-theme', theme);
+
+    // Update color preview
+    document.querySelector('.color-preview').style.backgroundColor = brandColor;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize preview
+    updatePreview();
+
+    // Add event listeners
+    document.getElementById('brandColor').addEventListener('input', updatePreview);
+    document.getElementById('brandName').addEventListener('input', updatePreview);
+    document.querySelectorAll('input[name="defaultTheme"]').forEach(radio => {
+        radio.addEventListener('change', updatePreview);
+    });
+
+    // Form submission
+    document.getElementById('brandingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success';
+                alert.textContent = 'Branding settings updated successfully';
+                this.insertAdjacentElement('beforebegin', alert);
+
+                // Remove alert after 3 seconds
+                setTimeout(() => alert.remove(), 3000);
+            }
+        });
+    });
+
     // Podman Status Check
     function checkPodmanStatus() {
         fetch('/admin/podman-status')
