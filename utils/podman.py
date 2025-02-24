@@ -2,8 +2,9 @@ import os
 import logging
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
-from models import Container, Service
 import subprocess
+import json
+from models import Container, Service
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,9 @@ class PodmanManager:
                 self.available = True
                 logger.info("Podman is available on the system")
             else:
-                logger.warning("Podman is not available")
+                logger.warning("Podman version check failed")
+        except FileNotFoundError:
+            logger.warning("Podman is not installed on the system")
         except Exception as e:
             logger.error(f"Error checking podman availability: {str(e)}")
 
@@ -47,70 +50,62 @@ class PodmanManager:
             if not status:
                 return "unhealthy"
 
-            # Check running containers
-            result = subprocess.run(['podman', 'ps', '--format', '{{.Status}}'], 
-                                 capture_output=True, text=True)
-            if result.returncode == 0:
-                containers = result.stdout.strip().split('\n')
-                unhealthy = sum(1 for status in containers if status 
-                              and not status.startswith('Up'))
-                return "healthy" if unhealthy == 0 else "degraded"
-            return "degraded"
+            return "healthy"
         except Exception as e:
             logger.error(f"Failed to get system health: {str(e)}")
             return "unhealthy"
 
     def get_detailed_health(self) -> Dict[str, Any]:
         """Get detailed system health information"""
-        if not self.available:
-            return {
-                'status': 'error',
-                'podman_available': False,
-                'message': 'Podman is not available on the system'
+        health_info = {
+            'status': 'error',
+            'podman_available': self.available,
+            'message': 'Podman is not available on the system',
+            'containers': {
+                'total': 0,
+                'running': 0,
+                'stopped': 0,
+                'failed': 0
+            },
+            'system_info': {
+                'os': os.uname().sysname,
+                'kernel': os.uname().release,
             }
+        }
+
+        if not self.available:
+            return health_info
 
         try:
             # Get version info
             version_result = subprocess.run(['podman', 'version', '--format', '{{.Version}}'], 
+                                       capture_output=True, text=True)
+
+            if version_result.returncode == 0:
+                health_info['version'] = version_result.stdout.strip()
+                health_info['status'] = 'ok'
+                health_info['message'] = 'Podman is running'
+
+                # Get container statistics if version check passed
+                stats_result = subprocess.run(['podman', 'ps', '-a', '--format', '{{.Status}}'], 
                                          capture_output=True, text=True)
 
-            # Get container statistics
-            stats_result = subprocess.run(['podman', 'ps', '-a', '--format', '{{.Status}}'], 
-                                        capture_output=True, text=True)
+                if stats_result.returncode == 0:
+                    containers = stats_result.stdout.strip().split('\n')
+                    if containers and containers[0]:  # Check if there are any containers
+                        health_info['containers'] = {
+                            'total': len(containers),
+                            'running': sum(1 for c in containers if c and c.startswith('Up')),
+                            'stopped': sum(1 for c in containers if c and c.startswith('Exited')),
+                            'failed': sum(1 for c in containers if c and 'Error' in c)
+                        }
 
-            if version_result.returncode == 0 and stats_result.returncode == 0:
-                containers = stats_result.stdout.strip().split('\n')
-                container_stats = {
-                    'total': len(containers),
-                    'running': sum(1 for c in containers if c and c.startswith('Up')),
-                    'stopped': sum(1 for c in containers if c and c.startswith('Exited')),
-                    'failed': sum(1 for c in containers if c and 'Error' in c)
-                }
-
-                return {
-                    'status': 'ok',
-                    'podman_available': True,
-                    'version': version_result.stdout.strip(),
-                    'containers': container_stats,
-                    'system_info': {
-                        'os': os.uname().sysname,
-                        'kernel': os.uname().release,
-                    }
-                }
-
-            return {
-                'status': 'error',
-                'podman_available': True,
-                'message': 'Failed to get system information'
-            }
+            return health_info
 
         except Exception as e:
             logger.error(f"Failed to get detailed health: {str(e)}")
-            return {
-                'status': 'error',
-                'podman_available': False,
-                'message': str(e)
-            }
+            health_info['message'] = str(e)
+            return health_info
 
     def get_container_status(self, container_id: str) -> Optional[Dict[str, Any]]:
         """Get current status and metrics of a container"""
@@ -119,9 +114,8 @@ class PodmanManager:
 
         try:
             result = subprocess.run(['podman', 'inspect', container_id], 
-                                  capture_output=True, text=True)
+                                capture_output=True, text=True)
             if result.returncode == 0:
-                import json
                 container_info = json.loads(result.stdout)[0]
                 return {
                     'status': container_info['State']['Status'],
@@ -277,7 +271,6 @@ class PodmanManager:
 
             # Deploy MySQL container
             mysql_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-mysql", '--env', f'MYSQL_ROOT_PASSWORD={db_password}', '--env', 'MYSQL_DATABASE=wordpress', '--env', 'MYSQL_USER=wordpress', '--env', f'MYSQL_PASSWORD={wp_password}', 'docker.io/mysql:8.0'], capture_output=True, text=True)
-
 
             # Deploy WordPress container
             wordpress_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-wordpress", '--env', 'WORDPRESS_DB_HOST=localhost', '--env', 'WORDPRESS_DB_USER=wordpress', '--env', f'WORDPRESS_DB_PASSWORD={wp_password}', '--env', 'WORDPRESS_DB_NAME=wordpress', '-p', '80:80', 'docker.io/wordpress:latest'], capture_output=True, text=True)
