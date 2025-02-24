@@ -7,25 +7,49 @@
     <hr class="my-4">
     <p>Get started by exploring our services or signing up for an account.</p>
     <p class="lead">
-        <a class="btn btn-primary btn-lg" href="{{ url_for('service.service_catalog') }}" role="button">View Services</a>
+        <a class="btn btn-primary btn-lg" href="{{ url_for('main.service_catalog') }}" role="button">View Services</a>
         {% if not current_user.is_authenticated %}
         <a class="btn btn-success btn-lg" href="{{ url_for('auth.register') }}" role="button">Sign Up</a>
         {% endif %}
     </p>
 </div>
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
 <div class="row mt-5">
-    <div class="col-md-4">
-        <h3><i data-feather="cloud"></i> Cloud Services</h3>
-        <p>Access our wide range of cloud services designed for your needs.</p>
-    </div>
-    <div class="col-md-4">
-        <h3><i data-feather="shield"></i> Security First</h3>
-        <p>Your data security is our top priority with industry-standard protection.</p>
-    </div>
-    <div class="col-md-4">
-        <h3><i data-feather="help-circle"></i> 24/7 Support</h3>
-        <p>Get help whenever you need it with our dedicated support team.</p>
-    </div>
+    {% if services %}
+        {% for service in services %}
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3><i data-feather="cloud"></i> {{ service.name }}</h3>
+                    <p>{{ service.description }}</p>
+                    <p class="text-muted">Starting at ${{ "%.2f"|format(service.price) }}/month</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                No services are currently available. Please check back later.
+            </div>
+        </div>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Feather icons
+    feather.replace();
+});
+</script>
 {% endblock %}

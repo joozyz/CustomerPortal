@@ -11,22 +11,25 @@ logger = logging.getLogger(__name__)
 @main.route('/')
 def index():
     try:
+        logger.debug("Fetching services for index page")
         services = Service.query.all()
-        logger.debug(f"Found {len(services)} services")
+        logger.info(f"Successfully found {len(services)} services")
         return render_template('index.html', services=services)
     except Exception as e:
-        logger.error(f"Error loading services: {str(e)}")
-        flash('Error loading services', 'danger')
+        logger.error(f"Error loading services for index page: {str(e)}")
+        flash('Error loading services. Please try again later.', 'danger')
         return render_template('index.html', services=[])
 
 @main.route('/services/catalog')
 def service_catalog():
     try:
+        logger.debug("Fetching services for catalog")
         services = Service.query.all()
+        logger.info(f"Successfully found {len(services)} services")
         return render_template('services/catalog.html', services=services)
     except Exception as e:
         logger.error(f"Error loading service catalog: {str(e)}")
-        flash('Error loading service catalog', 'danger')
+        flash('Error loading service catalog. Please try again later.', 'danger')
         return render_template('services/catalog.html', services=[])
 
 @main.route('/services/<int:service_id>/deploy', methods=['POST'])
@@ -34,6 +37,7 @@ def service_catalog():
 def deploy_service(service_id):
     try:
         service = Service.query.get_or_404(service_id)
+        logger.info(f"Attempting to deploy service {service.name} for user {current_user.id}")
 
         # Check if service is already deployed
         existing = Container.query.filter_by(
@@ -56,13 +60,15 @@ def deploy_service(service_id):
         if container:
             db.session.add(container)
             db.session.commit()
+            logger.info(f"Successfully deployed service {service.name} for user {current_user.id}")
             flash('Service deployed successfully!', 'success')
         else:
+            logger.error(f"Failed to deploy service {service.name} for user {current_user.id}")
             flash('Failed to deploy service', 'danger')
 
         return redirect(url_for('main.service_catalog'))
 
     except Exception as e:
         logger.error(f"Error deploying service: {str(e)}")
-        flash('Error deploying service', 'danger')
+        flash('Error deploying service. Please try again later.', 'danger')
         return redirect(url_for('main.service_catalog'))
