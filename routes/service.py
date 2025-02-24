@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, jsonify, session
 from flask_login import login_required, current_user
-from app import db
+from database import db
 from models import Service, Container, SystemActivity
 from utils.backup_manager import backup_manager
 from utils.podman import podman_manager
@@ -23,9 +23,11 @@ def dashboard():
         ).all()
         logger.debug(f"Found {len(services)} services for user {current_user.id}")
 
+        # Note: dashboard template should not include sidebar
         return render_template('dashboard.html',
-                            services=services,
-                            current_user=current_user)
+                          services=services,
+                          current_user=current_user,
+                          hide_sidebar=True)
     except Exception as e:
         logger.error(f"Error loading dashboard: {str(e)}")
         flash('An error occurred while loading the dashboard', 'danger')
