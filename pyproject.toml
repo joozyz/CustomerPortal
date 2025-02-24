@@ -25,4 +25,5 @@ dependencies = [
     "wtforms>=3.2.1",
     "flask-migrate>=4.1.0",
     "psutil>=7.0.0",
+    "openai>=1.64.0",
 ]

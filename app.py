@@ -9,7 +9,10 @@ from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
@@ -61,6 +64,8 @@ limiter = Limiter(
 def health_check():
     """Simple health check endpoint"""
     try:
+        # Test database connection
+        db.session.execute('SELECT 1')
         return jsonify({'status': 'ok', 'message': 'Service is healthy'}), 200
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -71,7 +76,7 @@ with app.app_context():
     try:
         logger.info("Starting application initialization...")
 
-        # Import models first
+        # Import models first to ensure they're registered with SQLAlchemy
         from models import User
 
         @login_manager.user_loader
@@ -89,14 +94,16 @@ with app.app_context():
         from routes.service import service
         from routes.billing import billing
         from routes.admin import admin
+        from routes.health import health #Added this line
 
         logger.info("Registering blueprints...")
         blueprints = [
             (auth, '/auth'),
-            (main, '/'),  # Root prefix for main routes
+            (main, '/'),
             (service, '/service'),
             (billing, '/billing'),
-            (admin, '/admin')
+            (admin, '/admin'),
+            (health, '/health') #Added this line
         ]
 
         for blueprint, url_prefix in blueprints:

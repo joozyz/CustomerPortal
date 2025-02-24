@@ -275,9 +275,11 @@
     <nav class="top-nav">
         <div class="d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
+                {% if request.endpoint != 'main.dashboard' %}
                 <button class="btn d-md-none me-2" id="sidebar-toggle">
                     <i data-feather="menu"></i>
                 </button>
+                {% endif %}
                 <a href="{{ url_for('main.index') }}" class="text-decoration-none">
                     <h4 class="mb-0 text-primary">{{ request.cookies.get('brandName', 'Cloud Services') }}</h4>
                 </a>
@@ -312,10 +314,6 @@
                             </div>
                         </div>
                         <div class="profile-menu-items">
-                            <a href="{{ url_for('admin.settings') }}" class="profile-menu-item">
-                                <i data-feather="user"></i>
-                                <span>Profile Settings</span>
-                            </a>
                             <a href="{{ url_for('service.dashboard') }}" class="profile-menu-item">
                                 <i data-feather="layout"></i>
                                 <span>Dashboard</span>
@@ -323,6 +321,10 @@
                             <a href="{{ url_for('billing.setup_billing') }}" class="profile-menu-item">
                                 <i data-feather="credit-card"></i>
                                 <span>Billing & Payments</span>
+                            </a>
+                            <a href="{{ url_for('admin.settings') }}" class="profile-menu-item">
+                                <i data-feather="settings"></i>
+                                <span>Settings</span>
                             </a>
                             {% if current_user.is_admin %}
                                 <div class="profile-divider"></div>
@@ -345,6 +347,7 @@
         </div>
     </nav>
 
+    {% if request.endpoint != 'main.dashboard' %}
     <nav class="sidebar">
         <div class="nav-section">
             <div class="nav-section-title">Main</div>
@@ -427,8 +430,9 @@
             </div>
         {% endif %}
     </nav>
+    {% endif %}
 
-    <main class="main-content">
+    <main class="main-content {% if request.endpoint == 'main.dashboard' %}ms-0{% endif %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -452,7 +456,6 @@
             const profileTrigger = document.getElementById('profileTrigger');
             const profileDropdown = document.getElementById('profileDropdown');
 
-            // Profile dropdown toggle
             if (profileTrigger && profileDropdown) {
                 profileTrigger.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -460,33 +463,38 @@
                     profileDropdown.classList.toggle('show');
                 });
 
-                // Close dropdown when clicking outside
                 document.addEventListener('click', (e) => {
                     if (!profileDropdown.contains(e.target) && !profileTrigger.contains(e.target)) {
                         profileDropdown.classList.remove('show');
                     }
                 });
 
-                // Prevent dropdown from closing when clicking inside
                 profileDropdown.addEventListener('click', (e) => {
                     if (e.target.tagName === 'A') {
-                        // Allow navigation for links
-                        return;
+                        return; // Allow navigation for links
                     }
                     e.stopPropagation();
                 });
             }
 
-            // Initialize tooltips if using Bootstrap
-            const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-            tooltips.forEach(tooltip => {
-                new bootstrap.Tooltip(tooltip);
-            });
+            {% if request.endpoint != 'main.dashboard' %}
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.querySelector('.sidebar');
 
-            // Ensure Feather icons are refreshed after any dynamic content changes
-            document.addEventListener('DOMContentLoaded', () => {
-                feather.replace();
-            });
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('active');
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (sidebar.classList.contains('active') && 
+                        !sidebar.contains(e.target) && 
+                        !sidebarToggle.contains(e.target)) {
+                        sidebar.classList.remove('active');
+                    }
+                });
+            }
+            {% endif %}
         });
     </script>
     {% block scripts %}{% endblock %}
