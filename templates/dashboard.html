@@ -38,6 +38,32 @@
                 {% endif %}
             </div>
         </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Subscription Status</h5>
+                {% if current_user.profile and current_user.profile.subscription_info %}
+                    <p><strong>Current Plan:</strong> {{ current_user.profile.subscription_info.plan_name|title }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge bg-{{ 'success' if current_user.profile.subscription_info.status == 'active' else 'warning' }}">
+                            {{ current_user.profile.subscription_info.status|title }}
+                        </span>
+                    </p>
+                    <p><strong>Next Bill Date:</strong> {{ current_user.profile.subscription_info.current_period_end.strftime('%Y-%m-%d') }}</p>
+                    <div class="mt-3">
+                        <a href="{{ url_for('billing.manage_subscription') }}" class="btn btn-primary">Manage Subscription</a>
+                        {% if current_user.profile.subscription_info.status == 'active' %}
+                            <form method="POST" action="{{ url_for('billing.cancel_subscription') }}" class="d-inline">
+                                <button type="submit" class="btn btn-outline-danger ms-2">Cancel Subscription</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p>No active subscription</p>
+                    <a href="{{ url_for('billing.select_plan') }}" class="btn btn-primary">Choose a Plan</a>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     <div class="col-md-8">
