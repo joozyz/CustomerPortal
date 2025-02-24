@@ -29,15 +29,9 @@
             </div>
             <div class="card-footer">
                 {% if current_user.is_authenticated %}
-                    {% if service.name == 'WordPress' %}
-                        <form action="{{ url_for('service.deploy_wordpress') }}" method="POST" class="d-inline">
-                            <button type="submit" class="btn btn-success">Deploy WordPress</button>
-                        </form>
-                    {% else %}
-                        <form action="{{ url_for('service.deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
-                            <button type="submit" class="btn btn-success">Deploy Service</button>
-                        </form>
-                    {% endif %}
+                    <form action="{{ url_for('main.deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-success">Deploy Service</button>
+                    </form>
                 {% else %}
                     <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Login to Deploy</a>
                 {% endif %}
