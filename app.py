@@ -66,7 +66,7 @@ def health_check():
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# Initialize database and load routes
+# Import and register blueprints
 with app.app_context():
     try:
         logger.info("Starting application initialization...")
@@ -82,7 +82,7 @@ with app.app_context():
                 logger.error(f"Error loading user {user_id}: {str(e)}")
                 return None
 
-        # Import and register blueprints individually
+        # Import and register blueprints
         logger.info("Importing blueprints...")
         from routes.auth import auth
         from routes.main import main
@@ -93,18 +93,15 @@ with app.app_context():
         logger.info("Registering blueprints...")
         blueprints = [
             (auth, '/auth'),
-            (main, None),  # No prefix for main routes
+            (main, '/'),  # Root prefix for main routes
             (service, '/service'),
             (billing, '/billing'),
-            (admin, None)  # Admin blueprint has its own prefix
+            (admin, '/admin')
         ]
 
         for blueprint, url_prefix in blueprints:
             try:
-                if url_prefix:
-                    app.register_blueprint(blueprint, url_prefix=url_prefix)
-                else:
-                    app.register_blueprint(blueprint)
+                app.register_blueprint(blueprint, url_prefix=url_prefix)
                 logger.info(f"Successfully registered blueprint: {blueprint.name}")
             except Exception as e:
                 logger.error(f"Failed to register blueprint {blueprint.name}: {str(e)}")

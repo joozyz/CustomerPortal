@@ -151,18 +151,109 @@
         }
 
         .user-menu {
+            position: relative;
             display: flex;
             align-items: center;
             gap: 1rem;
         }
 
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
+        .user-profile-trigger {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: background-color 0.2s;
         }
 
+        .user-profile-trigger:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+        }
+
+        .user-info {
+            display: none;
+            flex-direction: column;
+            text-align: left;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .user-email {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin: 0;
+        }
+
+        .profile-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-width: 220px;
+            display: none;
+            z-index: 1000;
+            margin-top: 0.5rem;
+        }
+
+        .profile-dropdown.show {
+            display: block;
+        }
+
+        .profile-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .profile-menu-items {
+            padding: 0.5rem 0;
+        }
+
+        .profile-menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            gap: 0.75rem;
+            transition: background-color 0.2s;
+        }
+
+        .profile-menu-item:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .profile-menu-item i {
+            color: var(--text-secondary);
+        }
+
+        .profile-divider {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 0.5rem 0;
+        }
+
+        @media (min-width: 768px) {
+            .user-info {
+                display: flex;
+            }
+        }
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -199,10 +290,54 @@
             </div>
             <div class="user-menu">
                 {% if current_user.is_authenticated %}
-                    <span class="d-none d-md-block">{{ current_user.username }}</span>
-                    <img src="{{ current_user.profile.profile_image or '/static/img/default-avatar.png' }}" 
-                         alt="Profile" 
-                         class="user-avatar">
+                    <div class="user-profile-trigger" id="profileTrigger">
+                        <img src="{{ current_user.profile.profile_image or '/static/img/default-avatar.png' }}" 
+                             alt="Profile" 
+                             class="user-avatar">
+                        <div class="user-info">
+                            <p class="user-name">{{ current_user.username }}</p>
+                            <p class="user-email">{{ current_user.email }}</p>
+                        </div>
+                    </div>
+                    <div class="profile-dropdown" id="profileDropdown">
+                        <div class="profile-header">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="{{ current_user.profile.profile_image or '/static/img/default-avatar.png' }}" 
+                                     alt="Profile" 
+                                     class="user-avatar">
+                                <div>
+                                    <p class="user-name">{{ current_user.username }}</p>
+                                    <p class="user-email">{{ current_user.email }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="profile-menu-items">
+                            <a href="{{ url_for('admin.settings') }}" class="profile-menu-item">
+                                <i data-feather="user"></i>
+                                <span>Profile Settings</span>
+                            </a>
+                            <a href="{{ url_for('service.dashboard') }}" class="profile-menu-item">
+                                <i data-feather="layout"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <a href="{{ url_for('billing.setup_billing') }}" class="profile-menu-item">
+                                <i data-feather="credit-card"></i>
+                                <span>Billing & Payments</span>
+                            </a>
+                            {% if current_user.is_admin %}
+                                <div class="profile-divider"></div>
+                                <a href="{{ url_for('admin.admin_dashboard') }}" class="profile-menu-item">
+                                    <i data-feather="shield"></i>
+                                    <span>Admin Panel</span>
+                                </a>
+                            {% endif %}
+                            <div class="profile-divider"></div>
+                            <a href="{{ url_for('auth.logout') }}" class="profile-menu-item text-danger">
+                                <i data-feather="log-out"></i>
+                                <span>Sign Out</span>
+                            </a>
+                        </div>
+                    </div>
                 {% else %}
                     <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm">Login</a>
                 {% endif %}
@@ -316,10 +451,27 @@
 
             const sidebarToggle = document.getElementById('sidebar-toggle');
             const sidebar = document.querySelector('.sidebar');
+            const profileTrigger = document.getElementById('profileTrigger');
+            const profileDropdown = document.getElementById('profileDropdown');
 
             if (sidebarToggle) {
                 sidebarToggle.addEventListener('click', () => {
                     sidebar.classList.toggle('active');
+                });
+            }
+
+            // Profile dropdown toggle
+            if (profileTrigger && profileDropdown) {
+                profileTrigger.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    profileDropdown.classList.toggle('show');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!profileDropdown.contains(e.target) && !profileTrigger.contains(e.target)) {
+                        profileDropdown.classList.remove('show');
+                    }
                 });
             }
 
