@@ -12,8 +12,9 @@ try:
     from .billing import billing
     from .auth import auth
     from .main import main
-    from .admin import admin
     from .service import service
+    # Import admin last to avoid circular dependencies
+    from .admin import admin
 except ImportError as e:
     logger.error(f"Error importing route modules: {e}", exc_info=True)
     raise

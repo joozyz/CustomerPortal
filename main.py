@@ -1,5 +1,6 @@
 import os
 import logging
+import traceback
 from app import app
 
 # Configure logging
@@ -21,7 +22,15 @@ if __name__ == "__main__":
                 logger.error(f"Missing required environment variable: {var}")
                 raise ValueError(f"Missing {var}")
 
+        # Print startup message to make it clear in the logs
+        print("=== Starting Flask Application ===")
+        print("Server will be available at http://0.0.0.0:5000")
+        print("Health check endpoint: http://0.0.0.0:5000/health")
+
         app.run(host="0.0.0.0", port=5000, debug=True)
     except Exception as e:
-        logger.error(f"Failed to start Flask server: {str(e)}", exc_info=True)
+        logger.error("Failed to start Flask server:")
+        logger.error(traceback.format_exc())
+        print("=== Server Failed to Start ===")
+        print(f"Error: {str(e)}")
         raise

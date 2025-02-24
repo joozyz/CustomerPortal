@@ -4,10 +4,11 @@ from flask_login import login_required, current_user
 from models import User, Service, Container, SystemActivity, SystemAlert, SystemSettings
 from utils import admin_required
 from utils.podman import podman_manager
+from database import db
+from extensions import limiter
 import logging
 import json
 import psutil
-from app import db
 from forms import SMTPSettingsForm
 
 # Configure logging for admin actions
