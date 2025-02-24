@@ -267,7 +267,8 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="{{ url_for('health.dashboard') }}" class="nav-link">
+                                    <a href="{{ url_for('admin.health_dashboard') }}" 
+                                       class="nav-link {% if request.endpoint == 'admin.health_dashboard' %}active{% endif %}">
                                         <i data-feather="activity"></i>
                                         <span>Health Monitor</span>
                                     </a>

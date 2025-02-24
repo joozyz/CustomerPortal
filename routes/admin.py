@@ -7,13 +7,15 @@ from datetime import datetime, timedelta
 import logging
 from app import db
 from forms import SMTPSettingsForm
+import psutil
+import json
 
 # Configure logging for admin actions
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 admin = Blueprint('admin', __name__, 
-                 template_folder='../templates/admin')
+                 template_folder='../templates/admin',
+                 url_prefix='/admin')
 
 @admin.before_request
 def check_admin():
@@ -24,29 +26,75 @@ def check_admin():
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('main.index'))
 
+@admin.route('/health/dashboard')
+@login_required
+@admin_required
+def health_dashboard():
+    """Render the health monitoring dashboard"""
+    try:
+        logger.info(f"Admin {current_user.username} accessing health dashboard")
+        return render_template('admin/health_dashboard.html')
+    except Exception as e:
+        logger.error(f"Error rendering health dashboard: {str(e)}", exc_info=True)
+        flash('Error loading health dashboard', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+
+@admin.route('/health/metrics')
+@login_required
+@admin_required
+def health_metrics():
+    """Get current health metrics"""
+    try:
+        logger.info("Collecting health metrics...")
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        boot_time = datetime.fromtimestamp(psutil.boot_time())
+        uptime = datetime.now() - boot_time
+
+        disk = psutil.disk_usage('/')
+        network = psutil.net_io_counters()
+
+        metrics = {
+            'status': 'ok',
+            'cpu': cpu_percent,
+            'memory': memory.percent,
+            'uptime': str(timedelta(seconds=int(uptime.total_seconds()))),
+            'disk': {
+                'total': disk.total,
+                'used': disk.used,
+                'free': disk.free,
+                'percent': disk.percent
+            },
+            'network': {
+                'bytes_sent': network.bytes_sent,
+                'bytes_recv': network.bytes_recv
+            }
+        }
+
+        logger.debug(f"Health metrics collected: {json.dumps(metrics)}")
+        return jsonify(metrics)
+    except Exception as e:
+        logger.error(f"Error getting health metrics: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @admin.route('/')
 @admin.route('/dashboard')
 @login_required
 @admin_required
 def admin_dashboard():
     try:
-        # Get basic metrics
         metrics = get_system_metrics()
-
-        # Get branding settings
         branding = {
             'default_theme': request.cookies.get('theme', 'light'),
             'brand_color': request.cookies.get('brandColor', '#007AFF'),
             'brand_name': request.cookies.get('brandName', 'Cloud Services')
         }
-
         return render_template('admin/dashboard.html',
                            metrics=metrics,
                            recent_activities=get_recent_activities(),
                            system_alerts=get_system_alerts(),
                            chart_data=get_chart_data(),
                            **branding)
-
     except Exception as e:
         logger.error(f"Error accessing admin dashboard: {str(e)}")
         flash('Error loading dashboard data. Please try again.', 'danger')
@@ -80,7 +128,6 @@ def update_branding():
         )
 
         return response
-
     except Exception as e:
         logger.error(f"Error updating branding: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500

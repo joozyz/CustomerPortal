@@ -13,7 +13,6 @@ try:
     from .main import main
     from .admin import admin
     from .service import service
-    from .health import health
 
     # Register blueprints
     logger.info("Registering blueprints...")
@@ -22,10 +21,9 @@ try:
     app.register_blueprint(main)
     app.register_blueprint(admin, url_prefix='/admin')
     app.register_blueprint(service, url_prefix='/service')
-    app.register_blueprint(health, url_prefix='/admin/health')
 
     # Export all blueprints
-    __all__ = ['billing', 'auth', 'main', 'admin', 'service', 'health']
+    __all__ = ['billing', 'auth', 'main', 'admin', 'service']
 
     logger.info("All blueprints registered successfully")
 except Exception as e:
