@@ -3,6 +3,8 @@ from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 import pyotp
+import logging
+logger = logging.getLogger(__name__)
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -52,6 +54,16 @@ class User(UserMixin, db.Model):
         """Disable 2FA for the user"""
         self.two_factor_enabled = False
         self.two_factor_secret = None
+
+    def delete(self):
+        """Override delete to ensure Stripe customer is deleted"""
+        if self.stripe_customer_id:
+            try:
+                import stripe
+                stripe.Customer.delete(self.stripe_customer_id)
+            except Exception as e:
+                logger.error(f"Error deleting Stripe customer: {str(e)}")
+        super().delete()
 
 class CustomerProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)

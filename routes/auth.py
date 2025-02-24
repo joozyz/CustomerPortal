@@ -8,6 +8,9 @@ import qrcode
 import io
 import base64
 import logging
+from utils.stripe_utils import create_stripe_customer #Import the function
+
+logger = logging.getLogger(__name__) #Added logger for error handling
 
 from forms import LoginForm
 
@@ -61,24 +64,44 @@ def register():
             flash('Email already registered', 'danger')
             return redirect(url_for('auth.register'))
 
-        user = User(
-            username=request.form.get('username'),
-            email=request.form.get('email')
-        )
-        user.set_password(request.form.get('password'))
+        try:
+            # Create user
+            user = User(
+                username=request.form.get('username'),
+                email=request.form.get('email')
+            )
+            user.set_password(request.form.get('password'))
 
-        profile = CustomerProfile(
-            company_name=request.form.get('company_name'),
-            phone=request.form.get('phone'),
-            address=request.form.get('address')
-        )
-        user.profile = profile
+            # Create customer profile
+            profile = CustomerProfile(
+                company_name=request.form.get('company_name'),
+                phone=request.form.get('phone'),
+                address=request.form.get('address')
+            )
+            user.profile = profile
 
-        db.session.add(user)
-        db.session.commit()
+            # Create Stripe customer
+            stripe_customer_id = create_stripe_customer(user)
+            if not stripe_customer_id:
+                logger.error(f"Failed to create Stripe customer for user {user.email}")
+                flash('Error creating account. Please try again.', 'danger')
+                return redirect(url_for('auth.register'))
 
-        flash('Registration successful!', 'success')
-        return redirect(url_for('auth.login'))
+            user.stripe_customer_id = stripe_customer_id
+
+            # Save everything to database
+            db.session.add(user)
+            db.session.commit()
+
+            logger.info(f"User {user.email} registered successfully with Stripe customer ID: {stripe_customer_id}")
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('auth.login'))
+
+        except Exception as e:
+            logger.error(f"Error during registration: {str(e)}")
+            db.session.rollback()
+            flash('Error creating account. Please try again.', 'danger')
+            return redirect(url_for('auth.register'))
 
     return render_template('register.html')
 
