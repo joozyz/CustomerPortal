@@ -25,11 +25,14 @@
 <div class="row mt-5">
     {% for service in services %}
     <div class="col-md-4">
-        <div class="card mb-4">
+        <div class="card mb-4 service-card">
             <div class="card-body">
-                <h3><i data-feather="cloud"></i> {{ service.name }}</h3>
-                <p>{{ service.description }}</p>
-                <p class="text-muted">Starting at ${{ "%.2f"|format(service.price) }}/month</p>
+                <div class="d-flex align-items-center mb-3">
+                    <i data-feather="cloud" class="me-2 text-primary"></i>
+                    <h3 class="mb-0">{{ service.name }}</h3>
+                </div>
+                <p class="card-text">{{ service.description }}</p>
+                <p class="text-muted mb-0">Starting at ${{ "%.2f"|format(service.price) }}/month</p>
             </div>
         </div>
     </div>
@@ -37,10 +40,37 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+<style>
+    .service-card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        border: none;
+        border-radius: var(--border-radius);
+        background: var(--card-background);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .service-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+
+    .service-card .card-body {
+        padding: 1.5rem;
+    }
+
+    .service-card h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Feather icons
+    // Re-run Feather icons for dynamically added content
     feather.replace();
 });
 </script>

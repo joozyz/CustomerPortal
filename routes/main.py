@@ -2,7 +2,6 @@ from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app import db
 from models import Service, Container
-from utils.podman_manager import podman_manager
 import logging
 
 main = Blueprint('main', __name__)
@@ -10,27 +9,45 @@ logger = logging.getLogger(__name__)
 
 @main.route('/')
 def index():
+    """Display landing page with featured services"""
     try:
-        logger.debug("Fetching services for index page")
-        services = Service.query.all()
-        logger.info(f"Successfully found {len(services)} services")
-        return render_template('index.html', services=services)
+        # Initialize services list
+        services = []
+
+        # Attempt to fetch active services
+        services = Service.query.filter_by(is_active=True).order_by(Service.price).all()
+
+        logger.info(f"Successfully loaded {len(services)} services for index page")
+
+        # Even if no services are found, we'll render the template
+        # The template will handle empty services list appropriately
+        return render_template('index.html', 
+                            services=services,
+                            current_user=current_user)
+
     except Exception as e:
         logger.error(f"Error loading services for index page: {str(e)}")
-        flash('Error loading services. Please try again later.', 'danger')
-        return render_template('index.html', services=[])
+        # Initialize an empty service list rather than showing an error
+        services = []
+        return render_template('index.html', 
+                            services=services,
+                            current_user=current_user)
 
 @main.route('/services/catalog')
 def service_catalog():
+    """Display full service catalog"""
     try:
         logger.debug("Fetching services for catalog")
-        services = Service.query.all()
+        services = Service.query.filter_by(is_active=True).all()
         logger.info(f"Successfully found {len(services)} services")
-        return render_template('services/catalog.html', services=services)
+        return render_template('services/catalog.html', 
+                            services=services,
+                            current_user=current_user)
     except Exception as e:
         logger.error(f"Error loading service catalog: {str(e)}")
-        flash('Error loading service catalog. Please try again later.', 'danger')
-        return render_template('services/catalog.html', services=[])
+        return render_template('services/catalog.html', 
+                            services=[],
+                            current_user=current_user)
 
 @main.route('/services/<int:service_id>/deploy', methods=['POST'])
 @login_required
