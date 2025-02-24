@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Find Your Perfect Solution - Cloud Service Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="quiz-container">
+                <div class="text-center mb-5">
+                    <h1 class="display-4">Find Your Perfect Solution</h1>
+                    <p class="lead">Answer a few questions to get personalized service recommendations</p>
+                </div>
+
+                <div id="quiz-progress" class="progress mb-4" style="height: 8px;">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+
+                <div id="questions-container">
+                    {% for question in questions %}
+                    <div class="question-slide" data-question="{{ question.id }}" {% if not loop.first %}style="display: none;"{% endif %}>
+                        <h3 class="mb-4">{{ question.text }}</h3>
+                        <div class="options-container">
+                            {% for option in question.options %}
+                            <div class="option-card mb-3" data-value="{{ option.id }}">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ option.text }}</h5>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="results-container" style="display: none;">
+                    <h3 class="mb-4">Recommended Services</h3>
+                    <div id="services-list" class="row">
+                        <!-- Services will be populated here -->
+                    </div>
+                    <div class="text-center mt-4">
+                        <button class="btn btn-outline-primary" onclick="restartQuiz()">Start Over</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .quiz-container {
+        padding: 2rem;
+        background: var(--card-background);
+        border-radius: var(--border-radius);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.05);
+    }
+
+    .option-card {
+        cursor: pointer;
+        transition: all var(--transition-speed);
+    }
+
+    .option-card:hover .card {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,122,255,0.1);
+    }
+
+    .option-card.selected .card {
+        border-color: var(--primary-color);
+        background-color: rgba(0,122,255,0.05);
+    }
+
+    .progress {
+        border-radius: var(--border-radius);
+        background-color: var(--background-color);
+    }
+
+    .progress-bar {
+        background-color: var(--primary-color);
+        transition: width 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentQuestion = 1;
+const totalQuestions = {{ questions|length }};
+const answers = {};
+
+function updateProgress() {
+    const progress = ((currentQuestion - 1) / totalQuestions) * 100;
+    document.querySelector('.progress-bar').style.width = `${progress}%`;
+}
+
+function selectOption(questionId, optionId) {
+    // Clear previous selection
+    document.querySelectorAll(`.question-slide[data-question="${questionId}"] .option-card`).forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Select new option
+    event.currentTarget.classList.add('selected');
+    answers[questionId] = optionId;
+
+    // Proceed to next question after a short delay
+    setTimeout(() => {
+        if (currentQuestion < totalQuestions) {
+            showNextQuestion();
+        } else {
+            submitQuiz();
+        }
+    }, 500);
+}
+
+function showNextQuestion() {
+    // Hide current question
+    document.querySelector(`.question-slide[data-question="${currentQuestion}"]`).style.display = 'none';
+    
+    // Show next question
+    currentQuestion++;
+    document.querySelector(`.question-slide[data-question="${currentQuestion}"]`).style.display = 'block';
+    
+    updateProgress();
+}
+
+function submitQuiz() {
+    fetch('/solution-finder/result', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(answers)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        displayResults(data.services);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while finding your perfect solution. Please try again.');
+    });
+}
+
+function displayResults(services) {
+    // Hide questions, show results
+    document.getElementById('questions-container').style.display = 'none';
+    document.getElementById('results-container').style.display = 'block';
+    
+    // Update progress bar to 100%
+    document.querySelector('.progress-bar').style.width = '100%';
+
+    // Display services
+    const servicesList = document.getElementById('services-list');
+    servicesList.innerHTML = services.map(service => `
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">${service.name}</h5>
+                    <p class="card-text">${service.description}</p>
+                    <p class="text-muted">Starting at $${service.price.toFixed(2)}/month</p>
+                    <a href="/services/${service.id}" class="btn btn-primary">Learn More</a>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function restartQuiz() {
+    // Reset all variables
+    currentQuestion = 1;
+    Object.keys(answers).forEach(key => delete answers[key]);
+    
+    // Reset UI
+    document.querySelectorAll('.option-card').forEach(card => card.classList.remove('selected'));
+    document.querySelectorAll('.question-slide').forEach(slide => slide.style.display = 'none');
+    document.querySelector('.question-slide[data-question="1"]').style.display = 'block';
+    document.getElementById('questions-container').style.display = 'block';
+    document.getElementById('results-container').style.display = 'none';
+    document.querySelector('.progress-bar').style.width = '0%';
+}
+
+// Add click handlers to all options
+document.querySelectorAll('.option-card').forEach(card => {
+    card.addEventListener('click', (event) => {
+        const questionId = event.currentTarget.closest('.question-slide').dataset.question;
+        const optionId = event.currentTarget.dataset.value;
+        selectOption(questionId, optionId);
+    });
+});
+</script>
+{% endblock %}

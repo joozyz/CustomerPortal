@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, jsonify, session
 from flask_login import login_required, current_user
 from app import db
 from models import Service, Container, SystemActivity
@@ -243,3 +243,68 @@ def service_catalog():
         logger.error(f"Error loading service catalog: {str(e)}")
         flash('An error occurred while loading the service catalog', 'danger')
         return redirect(url_for('main.index'))
+
+@service.route('/solution-finder')
+def solution_finder():
+    """Interactive quiz to help users find the right service"""
+    questions = [
+        {
+            'id': 1,
+            'text': 'What type of WordPress hosting do you need?',
+            'options': [
+                {'id': 'basic', 'text': 'Basic hosting for a simple blog or small website'},
+                {'id': 'business', 'text': 'Business hosting for e-commerce or high-traffic site'},
+                {'id': 'enterprise', 'text': 'Enterprise hosting with advanced security and scaling'}
+            ]
+        },
+        {
+            'id': 2,
+            'text': 'How much traffic do you expect?',
+            'options': [
+                {'id': 'low', 'text': 'Less than 10,000 visitors per month'},
+                {'id': 'medium', 'text': '10,000 - 50,000 visitors per month'},
+                {'id': 'high', 'text': 'More than 50,000 visitors per month'}
+            ]
+        },
+        {
+            'id': 3,
+            'text': 'What level of technical support do you need?',
+            'options': [
+                {'id': 'basic', 'text': 'Email support during business hours'},
+                {'id': 'priority', 'text': 'Priority support with phone access'},
+                {'id': 'dedicated', 'text': 'Dedicated support team'}
+            ]
+        }
+    ]
+    return render_template('services/solution_finder.html', questions=questions)
+
+@service.route('/solution-finder/result', methods=['POST'])
+def solution_finder_result():
+    """Process quiz answers and recommend services"""
+    answers = request.get_json()
+
+    # Simple recommendation logic based on answers
+    hosting_type = answers.get('1', 'basic')
+    traffic = answers.get('2', 'low')
+    support = answers.get('3', 'basic')
+
+    # Query matching services
+    try:
+        if hosting_type == 'enterprise' or traffic == 'high' or support == 'dedicated':
+            services = Service.query.filter(Service.price > 100).all()
+        elif hosting_type == 'business' or traffic == 'medium' or support == 'priority':
+            services = Service.query.filter(Service.price.between(50, 100)).all()
+        else:
+            services = Service.query.filter(Service.price <= 50).all()
+
+        return jsonify({
+            'services': [{
+                'id': service.id,
+                'name': service.name,
+                'description': service.description,
+                'price': float(service.price)
+            } for service in services]
+        })
+    except Exception as e:
+        logging.error(f"Error finding services: {str(e)}")
+        return jsonify({'error': 'Failed to find matching services'}), 500
