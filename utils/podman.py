@@ -1,8 +1,11 @@
-import podman
+import os
 import logging
 from typing import Optional, Dict, Any, List, Tuple
+from datetime import datetime
 from models import Container, Service
-import os
+import podman
+
+logger = logging.getLogger(__name__)
 
 class PodmanManager:
     def __init__(self):
@@ -12,13 +15,6 @@ class PodmanManager:
             self.connect()
         except Exception as e:
             self.logger.error(f"Podman initialization failed: {str(e)}")
-            # Try to get more detailed system information
-            try:
-                import subprocess
-                result = subprocess.run(['podman', 'info'], capture_output=True, text=True)
-                self.logger.info(f"Podman system info: {result.stdout}")
-            except Exception as e2:
-                self.logger.error(f"Failed to get Podman info: {str(e2)}")
 
     def connect(self) -> bool:
         """Initialize connection to Podman"""
@@ -29,9 +25,9 @@ class PodmanManager:
                 uri = f'unix://{xdg_runtime}/podman/podman.sock'
                 self.logger.info(f"Trying Podman socket at: {uri}")
                 try:
-                    self.client = podman.PodmanClient(base_url=uri)
+                    self.client = podman.Client(base_url=uri)
                     # Test connection
-                    self.client.ping()
+                    self.client.version
                     self.logger.info("Successfully connected to Podman via XDG_RUNTIME_DIR")
                     return True
                 except Exception as e:
@@ -40,9 +36,9 @@ class PodmanManager:
             # Try default system socket
             uri = 'unix:///run/podman/podman.sock'
             self.logger.info(f"Trying default Podman socket at: {uri}")
-            self.client = podman.PodmanClient(base_url=uri)
+            self.client = podman.Client(base_url=uri)
             # Test connection
-            self.client.ping()
+            self.client.version
             self.logger.info("Successfully connected to Podman via system socket")
             return True
 
@@ -56,16 +52,9 @@ class PodmanManager:
             if not self.client:
                 return False, "Podman service unavailable - no client connection"
 
-            # Test connection by pinging
+            # Test connection by getting version info
             try:
-                self.client.ping()
-            except Exception as e:
-                self.logger.error(f"Podman ping failed: {str(e)}")
-                return False, "Podman service unavailable - ping failed"
-
-            # Get Podman version info
-            try:
-                version = self.client.version()
+                version = self.client.version
                 return True, f"Podman {version['Version']} running"
             except Exception as e:
                 self.logger.error(f"Failed to get Podman version: {str(e)}")
@@ -75,6 +64,128 @@ class PodmanManager:
             error_msg = str(e)
             self.logger.error(f"Podman system check failed: {error_msg}")
             return False, f"Podman service unavailable - {error_msg}"
+
+    def get_system_health(self) -> str:
+        """Get overall system health status"""
+        try:
+            if not self.client:
+                return "unhealthy"
+
+            # Check basic connectivity
+            status, _ = self.check_system()
+            if not status:
+                return "unhealthy"
+
+            # Check container health
+            containers = self.client.containers.list()
+            unhealthy_containers = 0
+            for container in containers:
+                if container.status not in ['running', 'created']:
+                    unhealthy_containers += 1
+
+            return "healthy" if unhealthy_containers == 0 else "degraded"
+        except Exception as e:
+            self.logger.error(f"Failed to get system health: {str(e)}")
+            return "unhealthy"
+
+    def get_detailed_health(self) -> Dict[str, Any]:
+        """Get detailed system health information"""
+        try:
+            if not self.client:
+                return {
+                    'status': 'error',
+                    'podman_available': False,
+                    'message': 'Podman client not initialized'
+                }
+
+            # Get Podman version and info
+            version = self.client.version
+            info = self.client.info
+
+            # Get container statistics
+            containers = self.client.containers.list(all=True)
+            container_stats = {
+                'total': len(containers),
+                'running': len([c for c in containers if c.status == 'running']),
+                'stopped': len([c for c in containers if c.status == 'stopped']),
+                'failed': len([c for c in containers if c.status == 'exited'])
+            }
+
+            # Get system resources
+            return {
+                'status': 'ok',
+                'podman_available': True,
+                'version': version['Version'],
+                'containers': container_stats,
+                'system_info': {
+                    'os': info['host']['os'],
+                    'kernel': info['host']['kernel'],
+                    'memory': info['host']['memTotal'],
+                    'cpu_count': info['host']['cpus']
+                }
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to get detailed health: {str(e)}")
+            return {
+                'status': 'error',
+                'podman_available': False,
+                'message': str(e)
+            }
+
+    def get_container_status(self, container_id: str) -> Optional[Dict[str, Any]]:
+        """Get current status and metrics of a container"""
+        try:
+            if not self.client:
+                return None
+
+            container = self.client.containers.get(container_id)
+            if not container:
+                return None
+
+            stats = container.stats(stream=False)
+            return {
+                'status': container.status,
+                'cpu_usage': stats['cpu_stats']['cpu_usage']['total_usage'],
+                'memory_usage': stats['memory_stats']['usage'],
+                'network_rx': stats['networks']['eth0']['rx_bytes'],
+                'network_tx': stats['networks']['eth0']['tx_bytes']
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to get container status: {str(e)}")
+            return None
+
+    def stop_container(self, container_id: str) -> bool:
+        """Stop a running container"""
+        try:
+            if not self.client:
+                return False
+
+            container = self.client.containers.get(container_id)
+            if container:
+                container.stop()
+                return True
+            return False
+
+        except Exception as e:
+            self.logger.error(f"Failed to stop container: {str(e)}")
+            return False
+
+    def remove_container(self, container_id: str) -> bool:
+        """Remove a container"""
+        try:
+            if not self.client:
+                return False
+
+            container = self.client.containers.get(container_id)
+            if container:
+                container.remove(force=True)
+                return True
+            return False
+
+        except Exception as e:
+            self.logger.error(f"Failed to remove container: {str(e)}")
+            return False
 
     def deploy_lemp_stack(self, service: Service, user_id: int) -> Optional[Container]:
         if not self.check_system()[0]:
