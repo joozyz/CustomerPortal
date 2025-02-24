@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}SMTP Settings{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-4">Email Server Settings</h2>
+                    
+                    <form method="POST">
+                        {{ form.csrf_token }}
+                        
+                        <div class="mb-3">
+                            <label for="smtp_server" class="form-label">SMTP Server</label>
+                            {{ form.smtp_server(class="form-control", placeholder="e.g., smtp.gmail.com") }}
+                            {% if form.smtp_server.errors %}
+                                {% for error in form.smtp_server.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="smtp_port" class="form-label">SMTP Port</label>
+                            {{ form.smtp_port(class="form-control", placeholder="e.g., 587") }}
+                            {% if form.smtp_port.errors %}
+                                {% for error in form.smtp_port.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="smtp_username" class="form-label">SMTP Username</label>
+                            {{ form.smtp_username(class="form-control", placeholder="Your email address") }}
+                            {% if form.smtp_username.errors %}
+                                {% for error in form.smtp_username.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="smtp_password" class="form-label">SMTP Password</label>
+                            {{ form.smtp_password(class="form-control", placeholder="Your SMTP password or app-specific password") }}
+                            {% if form.smtp_password.errors %}
+                                {% for error in form.smtp_password.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                            <div class="form-text">
+                                For Gmail, use an App Password generated from your Google Account settings.
+                            </div>
+                        </div>
+
+                        {{ form.submit(class="btn btn-primary") }}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

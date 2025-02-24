@@ -1,11 +1,12 @@
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_login import login_required, current_user
-from models import User, Service, Container, SystemActivity, SystemAlert
+from models import User, Service, Container, SystemActivity, SystemAlert, SystemSettings
 from utils import admin_required
 from utils.podman import podman_manager
 from datetime import datetime, timedelta
 import logging
 from app import db
+from forms import SMTPSettingsForm
 
 # Configure logging for admin actions
 logging.basicConfig(level=logging.INFO)
@@ -267,3 +268,38 @@ def system_health():
             'status': 'error',
             'message': 'Failed to check system health'
         }), 500
+
+@admin.route('/settings/smtp', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def smtp_settings():
+    form = SMTPSettingsForm()
+
+    if form.validate_on_submit():
+        try:
+            # Save SMTP settings
+            SystemSettings.set_setting('SMTP_SERVER', form.smtp_server.data, 
+                                    'SMTP server hostname', False)
+            SystemSettings.set_setting('SMTP_PORT', form.smtp_port.data, 
+                                    'SMTP server port', False)
+            SystemSettings.set_setting('SMTP_USERNAME', form.smtp_username.data, 
+                                    'SMTP username/email', False)
+            SystemSettings.set_setting('SMTP_PASSWORD', form.smtp_password.data, 
+                                    'SMTP password/app password', True)
+
+            flash('SMTP settings updated successfully.', 'success')
+            logger.info(f"SMTP settings updated by admin {current_user.username}")
+            return redirect(url_for('admin.settings'))
+        except Exception as e:
+            logger.error(f"Error saving SMTP settings: {str(e)}")
+            flash('Error saving SMTP settings.', 'danger')
+            return redirect(url_for('admin.smtp_settings'))
+
+    # Pre-fill form with existing settings
+    if request.method == 'GET':
+        form.smtp_server.data = SystemSettings.get_setting('SMTP_SERVER', 'smtp.gmail.com')
+        form.smtp_port.data = SystemSettings.get_setting('SMTP_PORT', '587')
+        form.smtp_username.data = SystemSettings.get_setting('SMTP_USERNAME', '')
+        # Don't pre-fill password for security
+
+    return render_template('admin/smtp_settings.html', form=form)

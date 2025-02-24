@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -14,7 +15,10 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     stripe_customer_id = db.Column(db.String(120), unique=True)
-    # 2FA fields
+    # Password reset fields
+    reset_token = db.Column(db.String(100), unique=True)
+    reset_token_expiry = db.Column(db.DateTime)
+    # 2FA fields remain unchanged
     two_factor_secret = db.Column(db.String(32))
     two_factor_enabled = db.Column(db.Boolean, default=False)
     profile = db.relationship('CustomerProfile', backref='user', uselist=False)
@@ -26,6 +30,27 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def generate_reset_token(self):
+        """Generate a password reset token valid for 1 hour"""
+        self.reset_token = secrets.token_urlsafe(32)
+        self.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+        db.session.commit()
+        return self.reset_token
+
+    def verify_reset_token(self, token):
+        """Verify if the reset token is valid"""
+        if (self.reset_token != token or 
+            not self.reset_token_expiry or 
+            self.reset_token_expiry < datetime.utcnow()):
+            return False
+        return True
+
+    def clear_reset_token(self):
+        """Clear the reset token after use"""
+        self.reset_token = None
+        self.reset_token_expiry = None
+        db.session.commit()
 
     def get_2fa_uri(self):
         """Generate the 2FA provisioning URI"""
@@ -198,3 +223,30 @@ class SystemAlert(db.Model):
         self.resolved_at = datetime.utcnow()
         self.resolved_by = user
         db.session.commit()
+
+class SystemSettings(db.Model):
+    """Model for system-wide settings"""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.Text)
+    description = db.Column(db.Text)
+    is_secret = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @classmethod
+    def get_setting(cls, key, default=None):
+        """Get a setting value by key"""
+        setting = cls.query.filter_by(key=key).first()
+        return setting.value if setting else default
+
+    @classmethod
+    def set_setting(cls, key, value, description=None, is_secret=False):
+        """Set a setting value"""
+        setting = cls.query.filter_by(key=key).first()
+        if not setting:
+            setting = cls(key=key, description=description, is_secret=is_secret)
+        setting.value = value
+        db.session.add(setting)
+        db.session.commit()
+        return setting

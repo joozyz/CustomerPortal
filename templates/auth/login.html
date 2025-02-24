@@ -37,6 +37,9 @@
                                     <div class="text-danger small">{{ error }}</div>
                                 {% endfor %}
                             {% endif %}
+                            <div class="mt-2 text-end">
+                                <a href="{{ url_for('auth.reset_password_request') }}" class="text-primary small">Forgot password?</a>
+                            </div>
                         </div>
                         <div class="mb-4">
                             <div class="form-check">

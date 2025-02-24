@@ -9,10 +9,11 @@ import io
 import base64
 import logging
 from utils.stripe_utils import create_stripe_customer #Import the function
+from forms import LoginForm, RequestPasswordResetForm, ResetPasswordForm # Added imports
+from utils.email_utils import send_password_reset_email # Added import
+
 
 logger = logging.getLogger(__name__) #Added logger for error handling
-
-from forms import LoginForm
 
 auth = Blueprint('auth', __name__)
 
@@ -172,3 +173,46 @@ def verify_2fa():
 
 from app import app
 from flask import abort
+
+@auth.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+
+    form = RequestPasswordResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            token = user.generate_reset_token()
+            if send_password_reset_email(user, token):
+                flash('Check your email for password reset instructions.', 'info')
+                logger.info(f"Password reset requested for user {user.email}")
+            else:
+                flash('Error sending password reset email. Please try again later.', 'danger')
+                logger.error(f"Failed to send password reset email to {user.email}")
+        else:
+            flash('Check your email for password reset instructions.', 'info')
+        return redirect(url_for('auth.login'))
+
+    return render_template('auth/request_reset.html', form=form)
+
+@auth.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+
+    user = User.query.filter_by(reset_token=token).first()
+    if not user or not user.verify_reset_token(token):
+        flash('Invalid or expired reset link.', 'danger')
+        return redirect(url_for('auth.reset_password_request'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        user.clear_reset_token()
+        db.session.commit()
+        flash('Your password has been reset.', 'success')
+        logger.info(f"Password reset completed for user {user.email}")
+        return redirect(url_for('auth.login'))
+
+    return render_template('auth/reset_password.html', form=form)
