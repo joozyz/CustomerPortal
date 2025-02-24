@@ -111,6 +111,7 @@ class Service(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     stripe_price_id = db.Column(db.String(120))
     stripe_product_id = db.Column(db.String(120))
