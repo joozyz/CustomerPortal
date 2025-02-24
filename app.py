@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from sqlalchemy.orm import DeclarativeBase
@@ -38,12 +38,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Add request logging
-@app.before_request
-def log_request_info():
-    logger.debug('Request Headers: %s', dict(request.headers))
-    logger.debug('Request URL: %s', request.url)
-
 # Initialize extensions with app
 logger.info("Initializing Flask extensions...")
 db.init_app(app)
@@ -62,53 +56,84 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    """Simple health check endpoint"""
+    try:
+        return jsonify({'status': 'ok', 'message': 'Service is healthy'}), 200
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # Initialize database and load routes
 with app.app_context():
-    # Import models first
-    from models import User
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.get(int(user_id))
-
-    # Import routes package
-    logger.info("Importing and registering blueprints...")
     try:
+        logger.info("Starting application initialization...")
+
+        # Import models first
+        from models import User
+
+        @login_manager.user_loader
+        def load_user(user_id):
+            try:
+                return User.query.get(int(user_id))
+            except Exception as e:
+                logger.error(f"Error loading user {user_id}: {str(e)}")
+                return None
+
+        # Import and register blueprints individually
+        logger.info("Importing blueprints...")
         from routes.auth import auth
         from routes.main import main
         from routes.service import service
         from routes.billing import billing
         from routes.admin import admin
 
-        # Register blueprints
-        app.register_blueprint(auth)
-        app.register_blueprint(main)
-        app.register_blueprint(service)
-        app.register_blueprint(billing)
-        app.register_blueprint(admin)
+        logger.info("Registering blueprints...")
+        blueprints = [
+            (auth, '/auth'),
+            (main, None),  # No prefix for main routes
+            (service, '/service'),
+            (billing, '/billing'),
+            (admin, None)  # Admin blueprint has its own prefix
+        ]
+
+        for blueprint, url_prefix in blueprints:
+            try:
+                if url_prefix:
+                    app.register_blueprint(blueprint, url_prefix=url_prefix)
+                else:
+                    app.register_blueprint(blueprint)
+                logger.info(f"Successfully registered blueprint: {blueprint.name}")
+            except Exception as e:
+                logger.error(f"Failed to register blueprint {blueprint.name}: {str(e)}")
+                raise
 
         logger.info("All blueprints registered successfully")
 
         # Create database tables
         db.create_all()
         logger.info("Database tables created successfully")
+
+        # Configure Stripe
+        stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
+        if not stripe_secret_key:
+            logger.warning("STRIPE_SECRET_KEY not found in environment variables")
+
+        app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
+        app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
+
+        logger.info("Application initialization completed successfully")
+
     except Exception as e:
-        logger.error(f"Error during blueprint registration: {str(e)}", exc_info=True)
+        logger.error(f"Error during application setup: {str(e)}", exc_info=True)
         raise
 
-# Health check endpoint
-@app.route('/health')
-def health_check():
-    logger.info('Health check endpoint called')
-    return 'OK', 200
-
-# Configure Stripe
-stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
-if not stripe_secret_key:
-    logger.warning("STRIPE_SECRET_KEY not found in environment variables")
-
-app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
-app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
-
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    try:
+        logger.info("Starting Flask server on port 5000...")
+        app.run(host="0.0.0.0", port=5000, debug=True)
+    except Exception as e:
+        logger.error(f"Failed to start Flask server: {str(e)}", exc_info=True)
+        raise

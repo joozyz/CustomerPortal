@@ -1,14 +1,14 @@
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from models import User, Service, Container, SystemActivity, SystemAlert, SystemSettings
 from utils import admin_required
 from utils.podman import podman_manager
-from datetime import datetime, timedelta
 import logging
+import json
+import psutil
 from app import db
 from forms import SMTPSettingsForm
-import psutil
-import json
 
 # Configure logging for admin actions
 logger = logging.getLogger(__name__)
@@ -19,10 +19,13 @@ admin = Blueprint('admin', __name__,
 
 @admin.before_request
 def check_admin():
+    """Check if user is authenticated and is an admin"""
     if not current_user.is_authenticated:
+        logger.warning("Unauthenticated user attempted to access admin area")
         flash('Please log in first.', 'warning')
         return redirect(url_for('auth.login'))
     if not current_user.is_admin:
+        logger.warning(f"Non-admin user {current_user.username} attempted to access admin area")
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -46,11 +49,15 @@ def health_metrics():
     """Get current health metrics"""
     try:
         logger.info("Collecting health metrics...")
+        # Get basic system metrics
         cpu_percent = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
+
+        # Calculate uptime
         boot_time = datetime.fromtimestamp(psutil.boot_time())
         uptime = datetime.now() - boot_time
 
+        # Get disk and network info
         disk = psutil.disk_usage('/')
         network = psutil.net_io_counters()
 
@@ -71,7 +78,7 @@ def health_metrics():
             }
         }
 
-        logger.debug(f"Health metrics collected: {json.dumps(metrics)}")
+        logger.debug(f"Health metrics collected successfully: {json.dumps(metrics)}")
         return jsonify(metrics)
     except Exception as e:
         logger.error(f"Error getting health metrics: {str(e)}", exc_info=True)
