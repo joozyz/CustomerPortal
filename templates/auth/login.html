@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Cloud Service Management{% endblock %}
+{% block title %}Login - {{ request.cookies.get('brandName', 'Cloud Services') }}{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -19,20 +19,31 @@
                     </div>
 
                     <form method="POST" action="{{ url_for('auth.login') }}">
+                        {{ form.csrf_token }}
                         <div class="mb-3">
                             <label for="email" class="form-label">Email address</label>
-                            <input type="email" class="form-control" id="email" name="email" required autofocus>
+                            {{ form.email(class="form-control", id="email", placeholder="Enter your email") }}
+                            {% if form.email.errors %}
+                                {% for error in form.email.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
                         </div>
                         <div class="mb-4">
                             <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                            {{ form.password(class="form-control", id="password", placeholder="Enter your password") }}
+                            {% if form.password.errors %}
+                                {% for error in form.password.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
                         </div>
-                        {% if two_factor_enabled %}
                         <div class="mb-4">
-                            <label for="code" class="form-label">2FA Code</label>
-                            <input type="text" class="form-control" id="code" name="code" required>
+                            <div class="form-check">
+                                {{ form.remember_me(class="form-check-input") }}
+                                <label class="form-check-label" for="remember_me">Remember me</label>
+                            </div>
                         </div>
-                        {% endif %}
                         <button type="submit" class="btn btn-primary w-100">Sign in</button>
                     </form>
 
@@ -50,7 +61,7 @@
 <style>
     .form-control {
         border-radius: var(--border-radius);
-        border: 1px solid rgba(0,0,0,0.1);
+        border: 1px solid var(--border-color);
         padding: 0.75rem 1rem;
         font-size: 1rem;
         transition: all var(--transition-speed);
