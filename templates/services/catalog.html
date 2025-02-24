@@ -13,27 +13,45 @@
     <div class="col-md-4 mb-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">{{ service.name }}</h5>
+                <h5 class="card-title mb-0" data-tooltip="View detailed information about this service">{{ service.name }}</h5>
             </div>
             <div class="card-body">
                 <p class="card-text">{{ service.description }}</p>
                 <div class="specs-list mt-3">
-                    <p><i data-feather="cpu"></i> {{ service.cpu_quota }} CPU Cores</p>
-                    <p><i data-feather="database"></i> {{ service.memory_quota }}MB Memory</p>
-                    <p><i data-feather="hard-drive"></i> {{ service.storage_quota }}MB Storage</p>
+                    <p>
+                        <i data-feather="cpu" data-tooltip="CPU cores allocated to your service"></i> 
+                        {{ service.cpu_quota }} CPU Cores
+                    </p>
+                    <p>
+                        <i data-feather="database" data-tooltip="Available memory for your applications"></i> 
+                        {{ service.memory_quota }}MB Memory
+                    </p>
+                    <p>
+                        <i data-feather="hard-drive" data-tooltip="Storage space for your data"></i> 
+                        {{ service.storage_quota }}MB Storage
+                    </p>
                     {% if service.backup_enabled %}
-                    <p><i data-feather="save"></i> Daily Backups Included</p>
+                    <p>
+                        <i data-feather="save" data-tooltip="Automated daily backups included"></i> 
+                        Daily Backups Included
+                    </p>
                     {% endif %}
                 </div>
-                <h6 class="card-subtitle mb-2 text-muted">${{ "%.2f"|format(service.price) }}/month</h6>
+                <h6 class="card-subtitle mb-2 text-muted" data-tooltip="Monthly subscription cost">
+                    ${{ "%.2f"|format(service.price) }}/month
+                </h6>
             </div>
             <div class="card-footer">
                 {% if current_user.is_authenticated %}
                     <form action="{{ url_for('main.deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
-                        <button type="submit" class="btn btn-success">Deploy Service</button>
+                        <button type="submit" class="btn btn-success" data-tooltip="Deploy this service to your account">
+                            Deploy Service
+                        </button>
                     </form>
                 {% else %}
-                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Login to Deploy</a>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary" data-tooltip="Sign in to deploy services">
+                        Login to Deploy
+                    </a>
                 {% endif %}
             </div>
         </div>
@@ -42,7 +60,12 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tooltips.css') }}">
+{% endblock %}
+
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/tooltips.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Feather icons
