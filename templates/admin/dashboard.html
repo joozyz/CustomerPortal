@@ -1,11 +1,16 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Dashboard Overview{% endblock %}
+{% block title %}Admin Dashboard{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-12 mb-4">
-        <h2>Dashboard Overview</h2>
+        <h2>Admin Dashboard</h2>
+        {% if error %}
+        <div class="alert alert-danger">
+            There was an error loading the dashboard data. Some features may be unavailable.
+        </div>
+        {% endif %}
         <div id="podman-status" class="alert" style="display: none;"></div>
     </div>
 </div>
@@ -59,10 +64,12 @@
                     <div class="list-group-item">
                         <div class="d-flex w-100 justify-content-between">
                             <h6 class="mb-1">{{ activity.action }}</h6>
-                            <small class="text-muted">{{ activity.timestamp|timesince }}</small>
+                            <small class="text-muted">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
                         </div>
                         <p class="mb-1">{{ activity.description }}</p>
-                        <small>By {{ activity.user }}</small>
+                        {% if activity.user %}
+                        <small>By {{ activity.user.username }}</small>
+                        {% endif %}
                     </div>
                     {% else %}
                     <div class="list-group-item">No recent activity</div>
@@ -83,7 +90,7 @@
                     <div class="list-group-item list-group-item-{{ alert.level }}">
                         <div class="d-flex w-100 justify-content-between">
                             <h6 class="mb-1">{{ alert.title }}</h6>
-                            <small>{{ alert.timestamp|timesince }}</small>
+                            <small>{{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
                         </div>
                         <p class="mb-1">{{ alert.message }}</p>
                     </div>
