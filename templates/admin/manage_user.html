@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Manage User: {{ user.username }}</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.admin_dashboard') }}">Admin Dashboard</a></li>
+                    <li class="breadcrumb-item active">Manage User</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">User Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin.manage_user', user_id=user.id) }}">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" value="{{ user.username }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" value="{{ user.email }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="created_at" class="form-label">Account Created</label>
+                            <input type="text" class="form-control" id="created_at" 
+                                   value="{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Account Status</label>
+                            <div class="form-control">
+                                <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ 'Active' if user.is_active else 'Inactive' }}
+                                </span>
+                            </div>
+                        </div>
+                        <input type="hidden" name="action" value="{{ 'deactivate' if user.is_active else 'activate' }}">
+                        <button type="submit" class="btn {% if user.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                            {{ 'Deactivate Account' if user.is_active else 'Activate Account' }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Active Services</h5>
+                </div>
+                <div class="card-body">
+                    {% if user.services %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Service</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for service in user.services %}
+                                    <tr>
+                                        <td>{{ service.name }}</td>
+                                        <td>
+                                            <span class="badge {% if service.is_active %}bg-success{% else %}bg-warning{% endif %}">
+                                                {{ service.status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ service.created_at.strftime('%Y-%m-%d') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No active services</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Feather icons
+    feather.replace();
+});
+</script>
+{% endblock %}

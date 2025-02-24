@@ -1,6 +1,7 @@
 import podman
 import logging
 from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
 from models import Container
 
 logger = logging.getLogger(__name__)
@@ -14,17 +15,84 @@ class PodmanManager:
             logger.error(f"Failed to connect to Podman: {str(e)}")
             self.client = None
 
-    def check_system(self):
+    def check_system(self) -> Tuple[bool, str]:
         """Check if Podman system is available and running"""
         try:
             if not self.client:
                 return False, "Podman client not initialized"
-            
+
             version = self.client.version()
             return True, f"Podman {version['Version']} running"
         except Exception as e:
             logger.error(f"Podman system check failed: {str(e)}")
             return False, str(e)
+
+    def get_system_health(self) -> str:
+        """Get overall system health status"""
+        try:
+            if not self.client:
+                return "unhealthy"
+
+            # Check basic connectivity
+            status, _ = self.check_system()
+            if not status:
+                return "unhealthy"
+
+            # Check container health
+            containers = self.client.containers.list()
+            unhealthy_containers = 0
+            for container in containers:
+                if container.status not in ['running', 'created']:
+                    unhealthy_containers += 1
+
+            return "healthy" if unhealthy_containers == 0 else "degraded"
+        except Exception as e:
+            logger.error(f"Failed to get system health: {str(e)}")
+            return "unhealthy"
+
+    def get_detailed_health(self) -> Dict[str, Any]:
+        """Get detailed system health information"""
+        try:
+            if not self.client:
+                return {
+                    'status': 'error',
+                    'podman_available': False,
+                    'message': 'Podman client not initialized'
+                }
+
+            # Get Podman version and info
+            version = self.client.version()
+            info = self.client.info()
+
+            # Get container statistics
+            containers = self.client.containers.list(all=True)
+            container_stats = {
+                'total': len(containers),
+                'running': len([c for c in containers if c.status == 'running']),
+                'stopped': len([c for c in containers if c.status == 'stopped']),
+                'failed': len([c for c in containers if c.status == 'exited'])
+            }
+
+            # Get system resources
+            return {
+                'status': 'ok',
+                'podman_available': True,
+                'version': version['Version'],
+                'containers': container_stats,
+                'system_info': {
+                    'os': info['host']['os'],
+                    'kernel': info['host']['kernel'],
+                    'memory': info['host']['memTotal'],
+                    'cpu_count': info['host']['cpus']
+                }
+            }
+        except Exception as e:
+            logger.error(f"Failed to get detailed health: {str(e)}")
+            return {
+                'status': 'error',
+                'podman_available': False,
+                'message': str(e)
+            }
 
     def deploy_service(self, service, user_id, environment=None):
         """Deploy a service as a container"""
@@ -34,7 +102,7 @@ class PodmanManager:
                 return None
 
             container_name = f"{service.name.lower()}-{user_id}"
-            
+
             # Prepare container configuration
             container_config = {
                 'Image': service.container_image,
@@ -75,20 +143,20 @@ class PodmanManager:
             logger.error(f"Failed to deploy service: {str(e)}")
             return None
 
-    def get_container_status(self, container_id):
-        """Get current status of a container"""
+    def get_container_status(self, container_id: str) -> Optional[Dict[str, Any]]:
+        """Get current status and metrics of a container"""
         try:
             if not self.client:
-                return 'unknown'
+                return None
 
             container = self.client.containers.get(container_id)
             container_info = container.inspect()
-            
+
             # Update container metrics
             stats = container.stats(stream=False)
             cpu_stats = stats['cpu_stats']
             memory_stats = stats['memory_stats']
-            
+
             return {
                 'status': container_info['State']['Status'],
                 'cpu_usage': cpu_stats['cpu_usage']['total_usage'] / cpu_stats['system_cpu_usage'],
@@ -98,9 +166,9 @@ class PodmanManager:
 
         except Exception as e:
             logger.error(f"Failed to get container status: {str(e)}")
-            return 'unknown'
+            return None
 
-    def stop_container(self, container_id):
+    def stop_container(self, container_id: str) -> bool:
         """Stop a running container"""
         try:
             if not self.client:
@@ -114,7 +182,7 @@ class PodmanManager:
             logger.error(f"Failed to stop container: {str(e)}")
             return False
 
-    def remove_container(self, container_id):
+    def remove_container(self, container_id: str) -> bool:
         """Remove a container"""
         try:
             if not self.client:
