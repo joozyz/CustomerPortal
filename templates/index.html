@@ -23,25 +23,17 @@
 {% endwith %}
 
 <div class="row mt-5">
-    {% if services %}
-        {% for service in services %}
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h3><i data-feather="cloud"></i> {{ service.name }}</h3>
-                    <p>{{ service.description }}</p>
-                    <p class="text-muted">Starting at ${{ "%.2f"|format(service.price) }}/month</p>
-                </div>
+    {% for service in services %}
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3><i data-feather="cloud"></i> {{ service.name }}</h3>
+                <p>{{ service.description }}</p>
+                <p class="text-muted">Starting at ${{ "%.2f"|format(service.price) }}/month</p>
             </div>
         </div>
-        {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="alert alert-info">
-                No services are currently available. Please check back later.
-            </div>
-        </div>
-    {% endif %}
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}
 
