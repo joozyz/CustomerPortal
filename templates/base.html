@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +12,7 @@
     <!-- Add Feather Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
     <style>
-        :root {
+        :root[data-theme="light"] {
             --primary-color: #007AFF;
             --secondary-color: #5856D6;
             --success-color: #34C759;
@@ -23,10 +23,55 @@
             --card-background: #FFFFFF;
             --text-primary: #000000;
             --text-secondary: #6C6C6C;
-            --border-radius: 12px;
-            --transition-speed: 0.3s;
+            --border-color: rgba(0,0,0,0.1);
+            --hover-color: rgba(0,0,0,0.05);
         }
 
+        :root[data-theme="dark"] {
+            --primary-color: #0A84FF;
+            --secondary-color: #5E5CE6;
+            --success-color: #30D158;
+            --danger-color: #FF453A;
+            --warning-color: #FFD60A;
+            --info-color: #64D2FF;
+            --background-color: #1C1C1E;
+            --card-background: #2C2C2E;
+            --text-primary: #FFFFFF;
+            --text-secondary: #98989D;
+            --border-color: rgba(255,255,255,0.1);
+            --hover-color: rgba(255,255,255,0.05);
+        }
+
+        /* Rest of your existing CSS */
+        .theme-switcher {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--card-background);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .theme-switcher:hover {
+            background: var(--hover-color);
+        }
+
+        .color-picker {
+            display: none;
+        }
+
+        .color-preview {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        /* Your existing styles remain unchanged */
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--background-color);
@@ -34,6 +79,7 @@
             line-height: 1.5;
             margin: 0;
             padding: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         .app-container {
@@ -44,7 +90,7 @@
         .sidebar {
             width: 280px;
             background: var(--card-background);
-            border-right: 1px solid rgba(0,0,0,0.1);
+            border-right: 1px solid var(--border-color);
             position: fixed;
             height: 100vh;
             padding: 1.5rem;
@@ -102,8 +148,8 @@
         .card {
             background: var(--card-background);
             border-radius: var(--border-radius);
-            border: 1px solid rgba(0,0,0,0.1);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px var(--hover-color);
             transition: transform var(--transition-speed);
         }
 
@@ -117,7 +163,7 @@
             align-items: center;
             padding: 1rem 2rem;
             background: var(--card-background);
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 1px solid var(--border-color);
             margin-bottom: 2rem;
         }
 
@@ -288,6 +334,20 @@
                     </li>
                 {% endif %}
             </ul>
+            <div class="mt-auto pt-4">
+                <div class="theme-switcher" onclick="toggleTheme()">
+                    <i data-feather="sun" class="theme-icon-light"></i>
+                    <i data-feather="moon" class="theme-icon-dark" style="display: none;"></i>
+                    <span class="theme-text">Light Mode</span>
+                </div>
+                <div class="mt-2">
+                    <label for="brandColor" class="form-label">Brand Color</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="color-preview" id="colorPreview" onclick="document.getElementById('brandColor').click()"></div>
+                        <input type="color" id="brandColor" class="color-picker" value="#007AFF" onchange="updateBrandColor(this.value)">
+                    </div>
+                </div>
+            </div>
         </nav>
 
         <main class="main-content">
@@ -326,9 +386,53 @@
         // Initialize Feather icons
         feather.replace();
 
-        // Mobile menu toggle
-        document.querySelector('.navbar-toggler')?.addEventListener('click', () => {
-            document.querySelector('.sidebar').classList.toggle('active');
+        // Theme management
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+
+            // Update UI
+            const lightIcon = document.querySelector('.theme-icon-light');
+            const darkIcon = document.querySelector('.theme-icon-dark');
+            const themeText = document.querySelector('.theme-text');
+
+            if (theme === 'dark') {
+                lightIcon.style.display = 'none';
+                darkIcon.style.display = 'block';
+                themeText.textContent = 'Dark Mode';
+            } else {
+                lightIcon.style.display = 'block';
+                darkIcon.style.display = 'none';
+                themeText.textContent = 'Light Mode';
+            }
+
+            // Re-run Feather icons after theme change
+            feather.replace();
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            setTheme(newTheme);
+        }
+
+        function updateBrandColor(color) {
+            document.documentElement.style.setProperty('--primary-color', color);
+            localStorage.setItem('brandColor', color);
+            document.getElementById('colorPreview').style.backgroundColor = color;
+        }
+
+        // Initialize theme and brand color from localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            const savedColor = localStorage.getItem('brandColor') || '#007AFF';
+
+            setTheme(savedTheme);
+            updateBrandColor(savedColor);
+
+            // Initialize color picker and preview
+            document.getElementById('brandColor').value = savedColor;
+            document.getElementById('colorPreview').style.backgroundColor = savedColor;
         });
 
         // Close alert messages
