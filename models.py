@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 import secrets
-from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 import pyotp
 import logging
+from database import db
+
 logger = logging.getLogger(__name__)
 
 class User(UserMixin, db.Model):
@@ -15,10 +16,8 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     stripe_customer_id = db.Column(db.String(120), unique=True)
-    # Password reset fields
     reset_token = db.Column(db.String(100), unique=True)
     reset_token_expiry = db.Column(db.DateTime)
-    # 2FA fields remain unchanged
     two_factor_secret = db.Column(db.String(32))
     two_factor_enabled = db.Column(db.Boolean, default=False)
     profile = db.relationship('CustomerProfile', backref='user', uselist=False)
@@ -32,14 +31,12 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def generate_reset_token(self):
-        """Generate a password reset token valid for 1 hour"""
         self.reset_token = secrets.token_urlsafe(32)
         self.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
         db.session.commit()
         return self.reset_token
 
     def verify_reset_token(self, token):
-        """Verify if the reset token is valid"""
         if (self.reset_token != token or 
             not self.reset_token_expiry or 
             self.reset_token_expiry < datetime.utcnow()):
@@ -47,13 +44,11 @@ class User(UserMixin, db.Model):
         return True
 
     def clear_reset_token(self):
-        """Clear the reset token after use"""
         self.reset_token = None
         self.reset_token_expiry = None
         db.session.commit()
 
     def get_2fa_uri(self):
-        """Generate the 2FA provisioning URI"""
         if self.two_factor_secret:
             return pyotp.totp.TOTP(self.two_factor_secret).provisioning_uri(
                 name=self.email,
@@ -62,26 +57,22 @@ class User(UserMixin, db.Model):
         return None
 
     def verify_2fa(self, code):
-        """Verify a 2FA code"""
         if not self.two_factor_enabled or not self.two_factor_secret:
             return True
         totp = pyotp.TOTP(self.two_factor_secret)
         return totp.verify(code)
 
     def enable_2fa(self):
-        """Enable 2FA for the user"""
         if not self.two_factor_secret:
             self.two_factor_secret = pyotp.random_base32()
         self.two_factor_enabled = True
         return self.get_2fa_uri()
 
     def disable_2fa(self):
-        """Disable 2FA for the user"""
         self.two_factor_enabled = False
         self.two_factor_secret = None
 
     def delete(self):
-        """Override delete to ensure Stripe customer is deleted"""
         if self.stripe_customer_id:
             try:
                 import stripe
@@ -118,22 +109,18 @@ class Service(db.Model):
     container_image = db.Column(db.String(200))
     container_port = db.Column(db.Integer)
     environment_vars = db.Column(db.JSON)
-    # Resource quotas
-    cpu_quota = db.Column(db.Float, default=1.0)  # CPU cores
-    memory_quota = db.Column(db.Integer, default=512)  # MB
-    storage_quota = db.Column(db.Integer, default=1024)  # MB
-    # Domain management
-    domain = db.Column(db.String(255))  # Primary domain
-    domain_status = db.Column(db.String(20), default='pending')  # pending, active, error
+    cpu_quota = db.Column(db.Float, default=1.0)  
+    memory_quota = db.Column(db.Integer, default=512)  
+    storage_quota = db.Column(db.Integer, default=1024)  
+    domain = db.Column(db.String(255))  
+    domain_status = db.Column(db.String(20), default='pending')  
     ssl_enabled = db.Column(db.Boolean, default=False)
     ssl_expiry = db.Column(db.DateTime)
-    # Backup configuration
     backup_enabled = db.Column(db.Boolean, default=True)
-    backup_frequency = db.Column(db.String(20), default='daily')  # daily, weekly, monthly
+    backup_frequency = db.Column(db.String(20), default='daily')  
     backup_retention_days = db.Column(db.Integer, default=7)
     last_backup_at = db.Column(db.DateTime)
     backup_storage_path = db.Column(db.String(255))
-    # Monitoring
     monitoring_enabled = db.Column(db.Boolean, default=True)
     alert_email = db.Column(db.String(120))
     alert_phone = db.Column(db.String(20))
@@ -141,7 +128,6 @@ class Service(db.Model):
     containers = db.relationship('Container', backref='service', lazy='dynamic')
 
     def initialize_backup_config(self):
-        """Initialize default backup configuration"""
         if not self.backup_storage_path:
             self.backup_storage_path = f"/backups/{self.name.lower()}"
         if not self.backup_frequency:
@@ -159,7 +145,6 @@ class Container(db.Model):
     service_id = db.Column(db.Integer, db.ForeignKey('service.id'), nullable=False)
     port = db.Column(db.Integer)
     environment = db.Column(db.JSON)
-    # New fields for monitoring
     cpu_usage = db.Column(db.Float, default=0.0)
     memory_usage = db.Column(db.Integer, default=0)
     storage_usage = db.Column(db.Integer, default=0)
@@ -177,7 +162,6 @@ class Subscription(db.Model):
     cancelled_at = db.Column(db.DateTime)
 
 class SystemActivity(db.Model):
-    """Model for tracking admin and system activities"""
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     action = db.Column(db.String(100), nullable=False)
@@ -187,7 +171,6 @@ class SystemActivity(db.Model):
 
     @classmethod
     def log_activity(cls, action, description, user=None):
-        """Create a new activity log entry"""
         activity = cls(
             action=action,
             description=description,
@@ -197,19 +180,17 @@ class SystemActivity(db.Model):
         db.session.commit()
 
 class SystemAlert(db.Model):
-    """Model for system alerts and notifications"""
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     title = db.Column(db.String(200), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    level = db.Column(db.String(20), default='info')  # info, warning, error, critical
+    level = db.Column(db.String(20), default='info')  
     resolved_at = db.Column(db.DateTime)
     resolved_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     resolved_by = db.relationship('User', backref=db.backref('resolved_alerts', lazy='dynamic'))
 
     @classmethod
     def create_alert(cls, title, message, level='info'):
-        """Create a new system alert"""
         alert = cls(
             title=title,
             message=message,
@@ -220,13 +201,11 @@ class SystemAlert(db.Model):
         return alert
 
     def resolve(self, user):
-        """Mark an alert as resolved"""
         self.resolved_at = datetime.utcnow()
         self.resolved_by = user
         db.session.commit()
 
 class SystemSettings(db.Model):
-    """Model for system-wide settings"""
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(100), unique=True, nullable=False)
     value = db.Column(db.Text)
@@ -237,13 +216,11 @@ class SystemSettings(db.Model):
 
     @classmethod
     def get_setting(cls, key, default=None):
-        """Get a setting value by key"""
         setting = cls.query.filter_by(key=key).first()
         return setting.value if setting else default
 
     @classmethod
     def set_setting(cls, key, value, description=None, is_secret=False):
-        """Set a setting value"""
         setting = cls.query.filter_by(key=key).first()
         if not setting:
             setting = cls(key=key, description=description, is_secret=is_secret)

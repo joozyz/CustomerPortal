@@ -1,8 +1,27 @@
+import os
+import logging
 from app import app
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     try:
+        logger.info("Starting Flask server on port 5000...")
+        logger.debug("Checking environment variables...")
+        required_vars = ['DATABASE_URL', 'SESSION_SECRET']
+        for var in required_vars:
+            if var in os.environ:
+                logger.info(f"{var} is present")
+            else:
+                logger.error(f"Missing required environment variable: {var}")
+                raise ValueError(f"Missing {var}")
+
         app.run(host="0.0.0.0", port=5000, debug=True)
     except Exception as e:
-        print(f"Error starting Flask server: {str(e)}")
+        logger.error(f"Failed to start Flask server: {str(e)}", exc_info=True)
         raise

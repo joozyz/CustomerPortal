@@ -1,19 +1,19 @@
 from functools import wraps
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, abort
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from app import db, limiter
+from werkzeug.security import check_password_hash
+from database import db
+from extensions import limiter
 from models import User, CustomerProfile
 import qrcode
 import io
 import base64
 import logging
-from utils.stripe_utils import create_stripe_customer #Import the function
-from forms import LoginForm, RequestPasswordResetForm, ResetPasswordForm # Added imports
-from utils.email_utils import send_password_reset_email # Added import
+from utils.stripe_utils import create_stripe_customer
+from forms import LoginForm, RequestPasswordResetForm, ResetPasswordForm
+from utils.email_utils import send_password_reset_email
 
-
-logger = logging.getLogger(__name__) #Added logger for error handling
+logger = logging.getLogger(__name__)
 
 auth = Blueprint('auth', __name__)
 
@@ -170,9 +170,6 @@ def verify_2fa():
             flash('Invalid verification code', 'danger')
 
     return render_template('auth/verify_2fa.html')
-
-from app import app
-from flask import abort
 
 @auth.route('/reset_password_request', methods=['GET', 'POST'])
 def reset_password_request():
