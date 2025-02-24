@@ -17,59 +17,79 @@ class Base(DeclarativeBase):
 # Initialize extensions
 db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
+limiter = None
 
-# Create Flask app
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET")
+def create_app():
+    app = Flask(__name__)
+    app.secret_key = os.environ.get("SESSION_SECRET")
 
-# Configure SQLAlchemy with PostgreSQL
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Configure SQLAlchemy with PostgreSQL
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Configure Stripe
-stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
-if not stripe_secret_key:
-    logger.warning("STRIPE_SECRET_KEY not found in environment variables")
+    # Configure Stripe
+    stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
+    if not stripe_secret_key:
+        logger.warning("STRIPE_SECRET_KEY not found in environment variables")
 
-app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
-app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
+    app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
+    app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
 
-# Add request logging
-@app.before_request
-def log_request_info():
-    logger.debug('Request Headers: %s', dict(request.headers))
-    logger.debug('Request URL: %s', request.url)
+    # Configure Login Manager
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message_category = 'info'
 
-# Health check endpoint
-@app.route('/health')
-def health_check():
-    logger.info('Health check endpoint called')
-    return 'OK', 200
+    # Configure rate limiter
+    global limiter
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=["200 per day", "50 per hour"],
+        storage_uri="memory://"
+    )
 
-# Configure Login Manager
-login_manager.init_app(app)
-login_manager.login_view = 'auth.login'
-login_manager.login_message_category = 'info'
+    # Initialize database
+    db.init_app(app)
 
-# Configure rate limiter
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
-)
+    # Register blueprints
+    from routes.auth import auth
+    from routes.service import service
+    from routes.main import main
+    from routes.admin import admin
+    from routes.billing import billing
 
-# Initialize database
-db.init_app(app)
+    app.register_blueprint(auth, url_prefix='/auth')
+    app.register_blueprint(service, url_prefix='/service')
+    app.register_blueprint(main)
+    app.register_blueprint(admin, url_prefix='/admin')
+    app.register_blueprint(billing, url_prefix='/billing')
+
+    # Add request logging
+    @app.before_request
+    def log_request_info():
+        logger.debug('Request Headers: %s', dict(request.headers))
+        logger.debug('Request URL: %s', request.url)
+
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        logger.info('Health check endpoint called')
+        return 'OK', 200
+
+    return app
+
+# Create the application instance
+app = create_app()
 
 # Initialize application context and create database tables
 with app.app_context():
     # Import models first
-    from models import User
+    from models import User, Service, Container, CustomerProfile, BillingInfo, SystemActivity
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -79,6 +99,5 @@ with app.app_context():
     db.create_all()
     logger.info("Database tables created successfully")
 
-    # Import routes package which will register all blueprints
-    import routes
-    logger.info("Routes package imported successfully")
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
