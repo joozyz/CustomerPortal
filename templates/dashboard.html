@@ -1,182 +1,138 @@
-
 {% extends "base.html" %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <!-- Left Sidebar -->
+    <!-- System Status -->
+    <div class="row mb-4">
         <div class="col-md-3">
             <div class="card">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-4">
-                        <div class="avatar-lg">
-                            <img src="{{ current_user.profile.profile_image or '/static/img/default-avatar.png' }}" class="rounded-circle" alt="Profile">
-                        </div>
-                        <div class="ms-3">
-                            <h5 class="mb-1">{{ current_user.username }}</h5>
-                            <p class="text-muted mb-0">{{ current_user.email }}</p>
-                        </div>
-                    </div>
-                    
-                    <nav class="nav flex-column">
-                        <a class="nav-link active" href="#services">
-                            <i data-feather="grid"></i> Services
-                        </a>
-                        <a class="nav-link" href="#billing">
-                            <i data-feather="credit-card"></i> Billing
-                        </a>
-                        <a class="nav-link" href="#security">
-                            <i data-feather="shield"></i> Security
-                        </a>
-                        <a class="nav-link" href="#api">
-                            <i data-feather="key"></i> API Keys
-                        </a>
-                        <a class="nav-link" href="#analytics">
-                            <i data-feather="bar-chart-2"></i> Analytics
-                        </a>
-                        <a class="nav-link" href="#support">
-                            <i data-feather="help-circle"></i> Support
-                        </a>
-                        <a class="nav-link" href="#notifications">
-                            <i data-feather="bell"></i> Notifications
-                            <span class="badge bg-danger float-end">3</span>
-                        </a>
-                    </nav>
+                    <h6 class="card-title text-muted mb-0">Active Services</h6>
+                    <h2 class="mt-2 mb-0">{{ services|length }}</h2>
                 </div>
             </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted mb-0">CPU Usage</h6>
+                    <h2 class="mt-2 mb-0">{{ '%0.1f'|format(total_cpu_usage|default(0)) }}%</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted mb-0">Memory Usage</h6>
+                    <h2 class="mt-2 mb-0">{{ '%0.1f'|format(total_memory_usage|default(0)) }}%</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted mb-0">Storage Used</h6>
+                    <h2 class="mt-2 mb-0">{{ '%0.1f'|format(total_storage_usage|default(0)) }}GB</h2>
+                </div>
+            </div>
+        </div>
+    </div>
 
-            <!-- Quick Actions -->
-            <div class="card mt-4">
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Quick Actions</h5>
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-primary btn-sm">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary">
                             <i data-feather="plus-circle"></i> Deploy New Service
                         </button>
-                        <button class="btn btn-info btn-sm">
+                        <button class="btn btn-info">
                             <i data-feather="database"></i> Create Backup
                         </button>
-                        <button class="btn btn-secondary btn-sm">
+                        <button class="btn btn-secondary">
                             <i data-feather="globe"></i> Configure Domain
                         </button>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Main Content -->
-        <div class="col-md-9">
-            <!-- System Status -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted mb-0">Active Services</h6>
-                            <h2 class="mt-2 mb-0">{{ services|length }}</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted mb-0">CPU Usage</h6>
-                            <h2 class="mt-2 mb-0">{{ '%0.1f'|format(total_cpu_usage|default(0)) }}%</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted mb-0">Memory Usage</h6>
-                            <h2 class="mt-2 mb-0">{{ '%0.1f'|format(total_memory_usage|default(0)) }}%</h2>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted mb-0">Storage Used</h6>
-                            <h2 class="mt-2 mb-0">{{ '%0.1f'|format(total_storage_usage|default(0)) }}GB</h2>
-                        </div>
-                    </div>
-                </div>
+    <!-- Active Services -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Active Services</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Status</th>
+                            <th>Domain</th>
+                            <th>Last Backup</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if services %}
+                            {% for service in services %}
+                            <tr>
+                                <td>{{ service.name }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if service.domain_status == 'active' else 'warning' }}">
+                                        {{ service.domain_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if service.domain %}
+                                        {{ service.domain }}
+                                        {% if service.ssl_enabled %}
+                                            <i data-feather="lock" class="text-success" title="SSL Enabled"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-primary">Configure Domain</button>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if service.last_backup_at %}
+                                        {{ service.last_backup_at.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        No backups
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-success">
+                                            <i data-feather="play"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-info">
+                                            <i data-feather="refresh-cw"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger">
+                                            <i data-feather="stop-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">No active services</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
+        </div>
+    </div>
 
-            <!-- Active Services -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title">Active Services</h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Service</th>
-                                    <th>Status</th>
-                                    <th>Domain</th>
-                                    <th>Last Backup</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if services %}
-                                    {% for service in services %}
-                                    <tr>
-                                        <td>{{ service.name }}</td>
-                                        <td>
-                                            <span class="badge bg-{{ 'success' if service.domain_status == 'active' else 'warning' }}">
-                                                {{ service.domain_status }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {% if service.domain %}
-                                                {{ service.domain }}
-                                                {% if service.ssl_enabled %}
-                                                    <i data-feather="lock" class="text-success" title="SSL Enabled"></i>
-                                                {% endif %}
-                                            {% else %}
-                                                <button class="btn btn-sm btn-outline-primary">Configure Domain</button>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if service.last_backup_at %}
-                                                {{ service.last_backup_at.strftime('%Y-%m-%d %H:%M') }}
-                                            {% else %}
-                                                No backups
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <button class="btn btn-sm btn-success">
-                                                    <i data-feather="play"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-info">
-                                                    <i data-feather="refresh-cw"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-danger">
-                                                    <i data-feather="stop-circle"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center">No active services</td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Resource Usage Graph -->
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Resource Usage</h5>
-                    <canvas id="resourceUsageChart" height="100"></canvas>
-                </div>
-            </div>
+    <!-- Resource Usage Graph -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Resource Usage</h5>
+            <canvas id="resourceUsageChart" height="100"></canvas>
         </div>
     </div>
 </div>
@@ -216,26 +172,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-    });
-
-    // Initialize service status polling
-    const updateServiceStatus = (serviceId) => {
-        fetch(`/services/${serviceId}/status`)
-            .then(response => response.json())
-            .then(data => {
-                const statusBadge = document.querySelector(`#service-status-${serviceId}`);
-                if (statusBadge) {
-                    statusBadge.className = `badge bg-${data.status === 'running' ? 'success' : 'warning'}`;
-                    statusBadge.textContent = data.status;
-                }
-            });
-    };
-
-    // Update status every 30 seconds
-    document.querySelectorAll('[id^="service-status-"]').forEach(badge => {
-        const serviceId = badge.id.split('-').pop();
-        setInterval(() => updateServiceStatus(serviceId), 30000);
-        updateServiceStatus(serviceId);
     });
 });
 </script>

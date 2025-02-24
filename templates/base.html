@@ -449,20 +449,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             feather.replace();
 
-            const sidebarToggle = document.getElementById('sidebar-toggle');
-            const sidebar = document.querySelector('.sidebar');
             const profileTrigger = document.getElementById('profileTrigger');
             const profileDropdown = document.getElementById('profileDropdown');
-
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', () => {
-                    sidebar.classList.toggle('active');
-                });
-            }
 
             // Profile dropdown toggle
             if (profileTrigger && profileDropdown) {
                 profileTrigger.addEventListener('click', (e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     profileDropdown.classList.toggle('show');
                 });
@@ -473,14 +466,26 @@
                         profileDropdown.classList.remove('show');
                     }
                 });
+
+                // Prevent dropdown from closing when clicking inside
+                profileDropdown.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'A') {
+                        // Allow navigation for links
+                        return;
+                    }
+                    e.stopPropagation();
+                });
             }
 
-            document.addEventListener('click', (e) => {
-                if (sidebar.classList.contains('active') && 
-                    !sidebar.contains(e.target) && 
-                    !sidebarToggle.contains(e.target)) {
-                    sidebar.classList.remove('active');
-                }
+            // Initialize tooltips if using Bootstrap
+            const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltips.forEach(tooltip => {
+                new bootstrap.Tooltip(tooltip);
+            });
+
+            // Ensure Feather icons are refreshed after any dynamic content changes
+            document.addEventListener('DOMContentLoaded', () => {
+                feather.replace();
             });
         });
     </script>

@@ -113,14 +113,6 @@ with app.app_context():
         db.create_all()
         logger.info("Database tables created successfully")
 
-        # Configure Stripe
-        stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
-        if not stripe_secret_key:
-            logger.warning("STRIPE_SECRET_KEY not found in environment variables")
-
-        app.config["STRIPE_SECRET_KEY"] = stripe_secret_key
-        app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_key")
-
         logger.info("Application initialization completed successfully")
 
     except Exception as e:
