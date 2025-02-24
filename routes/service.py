@@ -250,29 +250,38 @@ def solution_finder():
     questions = [
         {
             'id': 1,
-            'text': 'What type of WordPress hosting do you need?',
+            'text': 'What type of WordPress website are you building?',
             'options': [
-                {'id': 'basic', 'text': 'Basic hosting for a simple blog or small website'},
-                {'id': 'business', 'text': 'Business hosting for e-commerce or high-traffic site'},
-                {'id': 'enterprise', 'text': 'Enterprise hosting with advanced security and scaling'}
+                {'id': 'blog', 'text': 'Personal Blog or Portfolio'},
+                {'id': 'business', 'text': 'Business Website or Online Store'},
+                {'id': 'enterprise', 'text': 'Enterprise Portal or High-Traffic Site'}
             ]
         },
         {
             'id': 2,
-            'text': 'How much traffic do you expect?',
+            'text': 'What is your expected monthly traffic?',
             'options': [
-                {'id': 'low', 'text': 'Less than 10,000 visitors per month'},
-                {'id': 'medium', 'text': '10,000 - 50,000 visitors per month'},
-                {'id': 'high', 'text': 'More than 50,000 visitors per month'}
+                {'id': 'small', 'text': 'Up to 10,000 visitors'},
+                {'id': 'medium', 'text': '10,000 - 50,000 visitors'},
+                {'id': 'large', 'text': 'Over 50,000 visitors'}
             ]
         },
         {
             'id': 3,
-            'text': 'What level of technical support do you need?',
+            'text': 'Which features are most important to you?',
             'options': [
-                {'id': 'basic', 'text': 'Email support during business hours'},
-                {'id': 'priority', 'text': 'Priority support with phone access'},
-                {'id': 'dedicated', 'text': 'Dedicated support team'}
+                {'id': 'performance', 'text': 'Fast Loading Speed and Performance'},
+                {'id': 'security', 'text': 'Enhanced Security and Daily Backups'},
+                {'id': 'support', 'text': '24/7 Technical Support and Maintenance'}
+            ]
+        },
+        {
+            'id': 4,
+            'text': 'What is your budget range per month?',
+            'options': [
+                {'id': 'basic', 'text': 'Up to $30'},
+                {'id': 'standard', 'text': '$30 - $100'},
+                {'id': 'premium', 'text': 'Over $100'}
             ]
         }
     ]
@@ -281,30 +290,67 @@ def solution_finder():
 @service.route('/solution-finder/result', methods=['POST'])
 def solution_finder_result():
     """Process quiz answers and recommend services"""
-    answers = request.get_json()
-
-    # Simple recommendation logic based on answers
-    hosting_type = answers.get('1', 'basic')
-    traffic = answers.get('2', 'low')
-    support = answers.get('3', 'basic')
-
-    # Query matching services
     try:
-        if hosting_type == 'enterprise' or traffic == 'high' or support == 'dedicated':
-            services = Service.query.filter(Service.price > 100).all()
-        elif hosting_type == 'business' or traffic == 'medium' or support == 'priority':
-            services = Service.query.filter(Service.price.between(50, 100)).all()
-        else:
-            services = Service.query.filter(Service.price <= 50).all()
+        answers = request.get_json()
+
+        # Initialize base query
+        query = Service.query
+
+        # Apply filters based on website type
+        if answers.get('1') == 'enterprise':
+            query = query.filter(
+                Service.cpu_quota >= 2,
+                Service.memory_quota >= 2048,
+                Service.backup_enabled == True
+            )
+        elif answers.get('1') == 'business':
+            query = query.filter(
+                Service.cpu_quota >= 1,
+                Service.memory_quota >= 1024
+            )
+
+        # Apply filters based on traffic expectations
+        if answers.get('2') == 'large':
+            query = query.filter(Service.memory_quota >= 2048)
+        elif answers.get('2') == 'medium':
+            query = query.filter(Service.memory_quota >= 1024)
+
+        # Apply filters based on features
+        if answers.get('3') == 'security':
+            query = query.filter(Service.backup_enabled == True)
+        elif answers.get('3') == 'performance':
+            query = query.filter(Service.cpu_quota >= 1)
+
+        # Apply budget filter
+        if answers.get('4') == 'basic':
+            query = query.filter(Service.price <= 30)
+        elif answers.get('4') == 'standard':
+            query = query.filter(Service.price.between(30, 100))
+        elif answers.get('4') == 'premium':
+            query = query.filter(Service.price > 100)
+
+        # Get matching services
+        matching_services = query.all()
+
+        # If no exact matches, get closest alternatives
+        if not matching_services:
+            matching_services = Service.query.order_by(Service.price).limit(3).all()
 
         return jsonify({
             'services': [{
                 'id': service.id,
                 'name': service.name,
                 'description': service.description,
-                'price': float(service.price)
-            } for service in services]
+                'price': float(service.price),
+                'features': [
+                    f"{service.cpu_quota} CPU Cores",
+                    f"{service.memory_quota}MB Memory",
+                    f"{service.storage_quota}MB Storage",
+                    "Daily Backups" if service.backup_enabled else None
+                ]
+            } for service in matching_services]
         })
+
     except Exception as e:
-        logging.error(f"Error finding services: {str(e)}")
+        logger.error(f"Error in solution finder: {str(e)}")
         return jsonify({'error': 'Failed to find matching services'}), 500
