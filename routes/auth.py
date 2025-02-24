@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from functools import wraps
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, limiter
 from models import User, CustomerProfile
@@ -8,6 +9,15 @@ import base64
 import logging
 
 auth = Blueprint('auth', __name__)
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('You do not have permission to access this page.', 'danger')
+            return abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
 
 @auth.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -22,14 +32,13 @@ def login():
 
         if not email or not password:
             flash('Please provide both email and password', 'danger')
-            return render_template('login.html')
+            return render_template('auth/login.html')
 
         try:
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 if user.two_factor_enabled:
                     if not code:
-                        # Store email in session for 2FA verification
                         session['email_2fa'] = email
                         return render_template('auth/verify_2fa.html')
                     elif not user.verify_2fa(code):
@@ -38,7 +47,9 @@ def login():
 
                 login_user(user)
                 logging.info(f"User {email} logged in successfully")
-                flash('Logged in successfully!', 'success')
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
                 return redirect(url_for('service.dashboard'))
             else:
                 logging.warning(f"Failed login attempt for email: {email}")
@@ -47,7 +58,7 @@ def login():
             logging.error(f"Login error: {str(e)}")
             flash('An error occurred during login', 'danger')
 
-    return render_template('login.html')
+    return render_template('auth/login.html')
 
 @auth.route('/register', methods=['GET', 'POST'])
 @limiter.limit("3 per hour")

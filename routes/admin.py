@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from models import User, Service, Container, SystemActivity, SystemAlert
-from utils import admin_required
+from routes.auth import admin_required
 from utils.podman import podman_manager
 from datetime import datetime, timedelta
 import logging
@@ -11,7 +11,6 @@ from app import db
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Update template folder path to point to the correct location
 admin = Blueprint('admin', __name__, 
                  template_folder='../templates/admin')
 
@@ -45,7 +44,6 @@ def admin_dashboard():
             date = datetime.utcnow() - timedelta(days=i)
             labels.append(date.strftime('%Y-%m-%d'))
 
-            # Count active users and services for each day
             users_data.append(User.query.filter(
                 User.created_at <= date
             ).count())
@@ -70,49 +68,73 @@ def admin_dashboard():
         }
 
         logger.info(f"Admin dashboard accessed by {current_user.username}")
-        return render_template('dashboard.html',
+        return render_template('admin/dashboard.html',
                            metrics=system_metrics,
                            recent_activities=recent_activities,
                            system_alerts=system_alerts,
                            chart_data=chart_data)
     except Exception as e:
         logger.error(f"Error accessing admin dashboard: {str(e)}")
-        flash('Error loading dashboard data', 'error')
-        return render_template('dashboard.html', error=True)
+        flash('Error loading dashboard data', 'danger')
+        return render_template('admin/dashboard.html', error=True)
 
 @admin.route('/users')
 @login_required
 @admin_required
 def manage_users():
-    users = User.query.all()
-    return render_template('users.html', users=users)
+    try:
+        users = User.query.all()
+        return render_template('admin/users.html', users=users)
+    except Exception as e:
+        logger.error(f"Error managing users: {str(e)}")
+        flash('Error loading user data', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
 
 @admin.route('/services')
 @login_required
 @admin_required
 def manage_services():
-    services = Service.query.all()
-    return render_template('services.html', services=services)
+    try:
+        services = Service.query.all()
+        return render_template('admin/services.html', services=services)
+    except Exception as e:
+        logger.error(f"Error managing services: {str(e)}")
+        flash('Error loading service data', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
 
 @admin.route('/monitoring')
 @login_required
 @admin_required
 def system_monitoring():
-    # Get detailed system health information
-    health_data = podman_manager.get_detailed_health()
-    return render_template('monitoring.html', health_data=health_data)
+    try:
+        health_data = podman_manager.get_detailed_health()
+        return render_template('admin/monitoring.html', health_data=health_data)
+    except Exception as e:
+        logger.error(f"Error accessing monitoring: {str(e)}")
+        flash('Error loading monitoring data', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
 
 @admin.route('/backups')
 @login_required
 @admin_required
 def backup_management():
-    return render_template('backups.html')
+    try:
+        return render_template('admin/backups.html')
+    except Exception as e:
+        logger.error(f"Error accessing backup management: {str(e)}")
+        flash('Error loading backup data', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
 
 @admin.route('/settings')
 @login_required
 @admin_required
 def settings():
-    return render_template('settings.html')
+    try:
+        return render_template('admin/settings.html')
+    except Exception as e:
+        logger.error(f"Error accessing settings: {str(e)}")
+        flash('Error loading settings', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
 
 @admin.route('/podman-status')
 @login_required
@@ -150,43 +172,11 @@ def manage_user(user_id):
                 flash('User has been activated', 'success')
             db.session.commit()
             return redirect(url_for('admin.manage_users'))
-        return render_template('manage_user.html', user=user)
+        return render_template('admin/manage_user.html', user=user)
     except Exception as e:
         logger.error(f"Error managing user {user_id}: {str(e)}")
-        flash('Error managing user', 'error')
+        flash('Error managing user', 'danger')
         return redirect(url_for('admin.manage_users'))
-
-@admin.route('/services/<int:service_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def manage_service(service_id):
-    try:
-        if service_id == 0:  # New service
-            service = Service()
-        else:
-            service = Service.query.get_or_404(service_id)
-
-        if request.method == 'POST':
-            service.name = request.form.get('name')
-            service.description = request.form.get('description')
-            service.price = float(request.form.get('price'))
-
-            if service_id == 0:
-                db.session.add(service)
-                logger.info(f"New service {service.name} created by admin {current_user.username}")
-                flash('New service has been created', 'success')
-            else:
-                logger.info(f"Service {service.id} updated by admin {current_user.username}")
-                flash('Service has been updated', 'success')
-
-            db.session.commit()
-            return redirect(url_for('admin.manage_services'))
-
-        return render_template('manage_service.html', service=service)
-    except Exception as e:
-        logger.error(f"Error managing service {service_id}: {str(e)}")
-        flash('Error managing service', 'error')
-        return redirect(url_for('admin.manage_services'))
 
 @admin.route('/system-health')
 @login_required
