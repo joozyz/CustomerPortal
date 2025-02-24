@@ -32,13 +32,20 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and check_password_hash(user.password_hash, form.password.data):
+            # Handle 2FA if enabled
+            if user.two_factor_enabled:
+                session['email_2fa'] = user.email
+                return redirect(url_for('auth.verify_2fa'))
+
             login_user(user, remember=form.remember_me.data)
-            logging.info(f"User {form.email.data} logged in successfully")
+            logging.info(f"User {user.email} logged in successfully")
+
             next_page = request.args.get('next')
-            if next_page:
+            if next_page and next_page.startswith('/'):  # Ensure next page is relative
                 return redirect(next_page)
             return redirect(url_for('main.index'))
-        flash('Invalid email or password', 'danger')
+
+        flash('Invalid password', 'danger')
         logging.warning(f"Failed login attempt for email: {form.email.data}")
 
     return render_template('auth/login.html', form=form)
