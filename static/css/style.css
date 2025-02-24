@@ -1,16 +1,30 @@
 /* Root variables for theming */
 :root {
   --primary-color: #007AFF;
+  --primary-hover: #0056b3;
   --background-color: #F5F5F7;
   --sidebar-color: #FFFFFF;
   --text-color: #1D1D1F;
   --text-secondary: #86868B;
   --border-color: #D2D2D7;
-  --hover-color: #F5F5F7;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
+  --hover-color: rgba(0, 122, 255, 0.1);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --radius-sm: 8px;
   --radius-md: 12px;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark theme variables */
+:root[data-theme="dark"] {
+  --primary-color: #0A84FF;
+  --primary-hover: #409CFF;
+  --background-color: #1C1C1E;
+  --sidebar-color: #2C2C2E;
+  --text-color: #FFFFFF;
+  --text-secondary: #98989D;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --hover-color: rgba(10, 132, 255, 0.1);
 }
 
 /* Base styles */
@@ -26,6 +40,13 @@ body {
   color: var(--text-color);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Enhance focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 /* Layout */
@@ -78,15 +99,29 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   text-decoration: none;
-  color: var(--text-color);
+  color: var(--text-secondary);
   border-radius: var(--radius-sm);
-  transition: all 0.2s ease;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
 }
 
 .nav-link:hover {
+  color: var(--text-color);
   background-color: var(--hover-color);
+  transform: translateX(4px);
+}
+
+.nav-link.active {
+  color: white;
+  background-color: var(--primary-color);
+}
+
+.nav-link.active:hover {
+  background-color: var(--primary-hover);
+  transform: translateX(4px);
 }
 
 .nav-icon {
@@ -116,6 +151,7 @@ body {
 .search-bar {
   position: relative;
   width: 300px;
+  transition: var(--transition);
 }
 
 .search-icon {
@@ -134,14 +170,13 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background-color: var(--background-color);
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
+  color: var(--text-color);
+  transition: var(--transition);
 }
 
 .search-input:focus {
-  outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
 .user-menu {
@@ -171,6 +206,18 @@ body {
   margin-bottom: 1rem;
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .alert-success {
@@ -194,23 +241,69 @@ body {
   padding: 0 0.5rem;
 }
 
+/* Enhanced button styles */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-weight: 500;
+  transition: var(--transition);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Card enhancements */
+.card {
+  background: var(--sidebar-color);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 /* Responsive design */
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   .app-container {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
     transform: translateX(-100%);
-    transition: transform 0.3s ease;
+    z-index: 1000;
+    transition: var(--transition);
   }
 
-  .sidebar.open {
+  .sidebar.active {
     transform: translateX(0);
   }
 
   .main-content {
     margin-left: 0;
+    padding: 1rem;
+  }
+
+  .search-bar {
+    width: 100%;
+    max-width: 300px;
   }
 }
 
