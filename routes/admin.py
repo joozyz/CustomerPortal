@@ -5,16 +5,18 @@ from utils import admin_required
 from utils.podman import podman_manager
 from datetime import datetime, timedelta
 import logging
-from app import db # Assuming db is defined in app.py
+from app import db
 
 # Configure logging for admin actions
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-admin = Blueprint('admin', __name__)
+# Update template folder path to point to the correct location
+admin = Blueprint('admin', __name__, 
+                 template_folder='../templates/admin')
 
-@admin.route('/admin')
-@admin.route('/admin/dashboard')
+@admin.route('/')
+@admin.route('/dashboard')
 @login_required
 @admin_required
 def admin_dashboard():
@@ -45,7 +47,6 @@ def admin_dashboard():
 
             # Count active users and services for each day
             users_data.append(User.query.filter(
-                User.is_active == True,
                 User.created_at <= date
             ).count())
 
@@ -63,13 +64,13 @@ def admin_dashboard():
         # Get system metrics
         system_metrics = {
             'total_users': len(users),
-            'active_services': len([s for s in services if s.is_active]),
+            'active_services': len([s for s in services if getattr(s, 'is_active', True)]),
             'total_containers': len(containers),
             'system_health': podman_manager.get_system_health()
         }
 
         logger.info(f"Admin dashboard accessed by {current_user.username}")
-        return render_template('admin/dashboard.html',
+        return render_template('dashboard.html',
                            metrics=system_metrics,
                            recent_activities=recent_activities,
                            system_alerts=system_alerts,
@@ -77,43 +78,43 @@ def admin_dashboard():
     except Exception as e:
         logger.error(f"Error accessing admin dashboard: {str(e)}")
         flash('Error loading dashboard data', 'error')
-        return render_template('admin/dashboard.html', error=True)
+        return render_template('dashboard.html', error=True)
 
-@admin.route('/admin/users')
+@admin.route('/users')
 @login_required
 @admin_required
 def manage_users():
     users = User.query.all()
-    return render_template('admin/users.html', users=users)
+    return render_template('users.html', users=users)
 
-@admin.route('/admin/services')
+@admin.route('/services')
 @login_required
 @admin_required
 def manage_services():
     services = Service.query.all()
-    return render_template('admin/services.html', services=services)
+    return render_template('services.html', services=services)
 
-@admin.route('/admin/monitoring')
+@admin.route('/monitoring')
 @login_required
 @admin_required
 def system_monitoring():
     # Get detailed system health information
     health_data = podman_manager.get_detailed_health()
-    return render_template('admin/monitoring.html', health_data=health_data)
+    return render_template('monitoring.html', health_data=health_data)
 
-@admin.route('/admin/backups')
+@admin.route('/backups')
 @login_required
 @admin_required
 def backup_management():
-    return render_template('admin/backups.html')
+    return render_template('backups.html')
 
-@admin.route('/admin/settings')
+@admin.route('/settings')
 @login_required
 @admin_required
 def settings():
-    return render_template('admin/settings.html')
+    return render_template('settings.html')
 
-@admin.route('/admin/podman-status')
+@admin.route('/podman-status')
 @login_required
 @admin_required
 def podman_status():
@@ -131,7 +132,7 @@ def podman_status():
             'message': 'Failed to check Podman status'
         }), 500
 
-@admin.route('/admin/users/<int:user_id>', methods=['GET', 'POST'])
+@admin.route('/users/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def manage_user(user_id):
@@ -147,15 +148,15 @@ def manage_user(user_id):
                 user.is_active = True
                 logger.info(f"User {user.username} activated by admin {current_user.username}")
                 flash('User has been activated', 'success')
-            db.session.commit() #Added to save changes
+            db.session.commit()
             return redirect(url_for('admin.manage_users'))
-        return render_template('admin/manage_user.html', user=user)
+        return render_template('manage_user.html', user=user)
     except Exception as e:
         logger.error(f"Error managing user {user_id}: {str(e)}")
         flash('Error managing user', 'error')
         return redirect(url_for('admin.manage_users'))
 
-@admin.route('/admin/services/<int:service_id>', methods=['GET', 'POST'])
+@admin.route('/services/<int:service_id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def manage_service(service_id):
@@ -181,13 +182,13 @@ def manage_service(service_id):
             db.session.commit()
             return redirect(url_for('admin.manage_services'))
 
-        return render_template('admin/manage_service.html', service=service)
+        return render_template('manage_service.html', service=service)
     except Exception as e:
         logger.error(f"Error managing service {service_id}: {str(e)}")
         flash('Error managing service', 'error')
         return redirect(url_for('admin.manage_services'))
 
-@admin.route('/admin/system-health')
+@admin.route('/system-health')
 @login_required
 @admin_required
 def system_health():

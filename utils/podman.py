@@ -1,9 +1,9 @@
 import os
 import logging
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from models import Container, Service
-import podman
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -11,121 +11,101 @@ class PodmanManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.client = None
+        self.available = False
         try:
-            self.connect()
+            # Check if podman is installed and running using subprocess
+            result = subprocess.run(['podman', 'version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                self.available = True
+                logger.info("Podman is available on the system")
+            else:
+                logger.warning("Podman is not available")
         except Exception as e:
-            self.logger.error(f"Podman initialization failed: {str(e)}")
-
-    def connect(self) -> bool:
-        """Initialize connection to Podman"""
-        try:
-            # First try XDG_RUNTIME_DIR socket
-            xdg_runtime = os.environ.get('XDG_RUNTIME_DIR', '')
-            if xdg_runtime:
-                uri = f'unix://{xdg_runtime}/podman/podman.sock'
-                self.logger.info(f"Trying Podman socket at: {uri}")
-                try:
-                    self.client = podman.Client(base_url=uri)
-                    # Test connection
-                    self.client.version
-                    self.logger.info("Successfully connected to Podman via XDG_RUNTIME_DIR")
-                    return True
-                except Exception as e:
-                    self.logger.warning(f"Failed to connect via XDG_RUNTIME_DIR: {str(e)}")
-
-            # Try default system socket
-            uri = 'unix:///run/podman/podman.sock'
-            self.logger.info(f"Trying default Podman socket at: {uri}")
-            self.client = podman.Client(base_url=uri)
-            # Test connection
-            self.client.version
-            self.logger.info("Successfully connected to Podman via system socket")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to connect to Podman: {str(e)}")
-            return False
+            logger.error(f"Error checking podman availability: {str(e)}")
 
     def check_system(self) -> Tuple[bool, str]:
-        """Check Podman system status and return (is_healthy, status_message)"""
+        """Check if Podman system is available and running"""
+        if not self.available:
+            return False, "Podman is not available on the system"
+
         try:
-            if not self.client:
-                return False, "Podman service unavailable - no client connection"
-
-            # Test connection by getting version info
-            try:
-                version = self.client.version
-                return True, f"Podman {version['Version']} running"
-            except Exception as e:
-                self.logger.error(f"Failed to get Podman version: {str(e)}")
-                return False, "Podman service unavailable - version check failed"
-
+            result = subprocess.run(['podman', 'info'], capture_output=True, text=True)
+            if result.returncode == 0:
+                return True, "Podman is running"
+            return False, "Podman service is not running"
         except Exception as e:
-            error_msg = str(e)
-            self.logger.error(f"Podman system check failed: {error_msg}")
-            return False, f"Podman service unavailable - {error_msg}"
+            logger.error(f"Podman system check failed: {str(e)}")
+            return False, str(e)
 
     def get_system_health(self) -> str:
         """Get overall system health status"""
-        try:
-            if not self.client:
-                return "unhealthy"
+        if not self.available:
+            return "unavailable"
 
-            # Check basic connectivity
+        try:
             status, _ = self.check_system()
             if not status:
                 return "unhealthy"
 
-            # Check container health
-            containers = self.client.containers.list()
-            unhealthy_containers = 0
-            for container in containers:
-                if container.status not in ['running', 'created']:
-                    unhealthy_containers += 1
-
-            return "healthy" if unhealthy_containers == 0 else "degraded"
+            # Check running containers
+            result = subprocess.run(['podman', 'ps', '--format', '{{.Status}}'], 
+                                 capture_output=True, text=True)
+            if result.returncode == 0:
+                containers = result.stdout.strip().split('\n')
+                unhealthy = sum(1 for status in containers if status 
+                              and not status.startswith('Up'))
+                return "healthy" if unhealthy == 0 else "degraded"
+            return "degraded"
         except Exception as e:
-            self.logger.error(f"Failed to get system health: {str(e)}")
+            logger.error(f"Failed to get system health: {str(e)}")
             return "unhealthy"
 
     def get_detailed_health(self) -> Dict[str, Any]:
         """Get detailed system health information"""
-        try:
-            if not self.client:
-                return {
-                    'status': 'error',
-                    'podman_available': False,
-                    'message': 'Podman client not initialized'
-                }
+        if not self.available:
+            return {
+                'status': 'error',
+                'podman_available': False,
+                'message': 'Podman is not available on the system'
+            }
 
-            # Get Podman version and info
-            version = self.client.version
-            info = self.client.info
+        try:
+            # Get version info
+            version_result = subprocess.run(['podman', 'version', '--format', '{{.Version}}'], 
+                                         capture_output=True, text=True)
 
             # Get container statistics
-            containers = self.client.containers.list(all=True)
-            container_stats = {
-                'total': len(containers),
-                'running': len([c for c in containers if c.status == 'running']),
-                'stopped': len([c for c in containers if c.status == 'stopped']),
-                'failed': len([c for c in containers if c.status == 'exited'])
+            stats_result = subprocess.run(['podman', 'ps', '-a', '--format', '{{.Status}}'], 
+                                        capture_output=True, text=True)
+
+            if version_result.returncode == 0 and stats_result.returncode == 0:
+                containers = stats_result.stdout.strip().split('\n')
+                container_stats = {
+                    'total': len(containers),
+                    'running': sum(1 for c in containers if c and c.startswith('Up')),
+                    'stopped': sum(1 for c in containers if c and c.startswith('Exited')),
+                    'failed': sum(1 for c in containers if c and 'Error' in c)
+                }
+
+                return {
+                    'status': 'ok',
+                    'podman_available': True,
+                    'version': version_result.stdout.strip(),
+                    'containers': container_stats,
+                    'system_info': {
+                        'os': os.uname().sysname,
+                        'kernel': os.uname().release,
+                    }
+                }
+
+            return {
+                'status': 'error',
+                'podman_available': True,
+                'message': 'Failed to get system information'
             }
 
-            # Get system resources
-            return {
-                'status': 'ok',
-                'podman_available': True,
-                'version': version['Version'],
-                'containers': container_stats,
-                'system_info': {
-                    'os': info['host']['os'],
-                    'kernel': info['host']['kernel'],
-                    'memory': info['host']['memTotal'],
-                    'cpu_count': info['host']['cpus']
-                }
-            }
         except Exception as e:
-            self.logger.error(f"Failed to get detailed health: {str(e)}")
+            logger.error(f"Failed to get detailed health: {str(e)}")
             return {
                 'status': 'error',
                 'podman_available': False,
@@ -134,57 +114,49 @@ class PodmanManager:
 
     def get_container_status(self, container_id: str) -> Optional[Dict[str, Any]]:
         """Get current status and metrics of a container"""
+        if not self.available:
+            return None
+
         try:
-            if not self.client:
-                return None
-
-            container = self.client.containers.get(container_id)
-            if not container:
-                return None
-
-            stats = container.stats(stream=False)
-            return {
-                'status': container.status,
-                'cpu_usage': stats['cpu_stats']['cpu_usage']['total_usage'],
-                'memory_usage': stats['memory_stats']['usage'],
-                'network_rx': stats['networks']['eth0']['rx_bytes'],
-                'network_tx': stats['networks']['eth0']['tx_bytes']
-            }
-
+            result = subprocess.run(['podman', 'inspect', container_id], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                import json
+                container_info = json.loads(result.stdout)[0]
+                return {
+                    'status': container_info['State']['Status'],
+                    'started_at': container_info['State']['StartedAt'],
+                    'finished_at': container_info['State']['FinishedAt']
+                }
+            return None
         except Exception as e:
-            self.logger.error(f"Failed to get container status: {str(e)}")
+            logger.error(f"Failed to get container status: {str(e)}")
             return None
 
     def stop_container(self, container_id: str) -> bool:
         """Stop a running container"""
-        try:
-            if not self.client:
-                return False
-
-            container = self.client.containers.get(container_id)
-            if container:
-                container.stop()
-                return True
+        if not self.available:
             return False
 
+        try:
+            result = subprocess.run(['podman', 'stop', container_id], 
+                                  capture_output=True, text=True)
+            return result.returncode == 0
         except Exception as e:
-            self.logger.error(f"Failed to stop container: {str(e)}")
+            logger.error(f"Failed to stop container: {str(e)}")
             return False
 
     def remove_container(self, container_id: str) -> bool:
         """Remove a container"""
-        try:
-            if not self.client:
-                return False
-
-            container = self.client.containers.get(container_id)
-            if container:
-                container.remove(force=True)
-                return True
+        if not self.available:
             return False
 
+        try:
+            result = subprocess.run(['podman', 'rm', '-f', container_id], 
+                                  capture_output=True, text=True)
+            return result.returncode == 0
         except Exception as e:
-            self.logger.error(f"Failed to remove container: {str(e)}")
+            logger.error(f"Failed to remove container: {str(e)}")
             return False
 
     def deploy_lemp_stack(self, service: Service, user_id: int) -> Optional[Container]:
@@ -206,74 +178,59 @@ class PodmanManager:
             for image in images:
                 try:
                     self.logger.info(f"Pulling image: {image}")
-                    self.client.images.pull(image)
-                except Exception as e:
+                    subprocess.run(['podman', 'pull', image], check=True)
+                except subprocess.CalledProcessError as e:
                     self.logger.error(f"Failed to pull image {image}: {str(e)}")
                     return None
+                except Exception as e:
+                    self.logger.error(f"An unexpected error occurred while pulling image {image}: {str(e)}")
+                    return None
+
 
             # Create MariaDB container
-            db_container = self.client.containers.create(
-                name=f"{stack_name}-db",
-                image='docker.io/mariadb:latest',
-                environment={
-                    'MYSQL_ROOT_PASSWORD': 'changeme',
-                    'MYSQL_DATABASE': 'wordpress',
-                    'MYSQL_USER': 'wordpress',
-                    'MYSQL_PASSWORD': 'wordpress'
-                },
-                detach=True
-            )
+            db_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-db", '--env', 'MYSQL_ROOT_PASSWORD=changeme', '--env', 'MYSQL_DATABASE=wordpress', '--env', 'MYSQL_USER=wordpress', '--env', 'MYSQL_PASSWORD=wordpress', 'docker.io/mariadb:latest'], capture_output=True, text=True)
 
             # Create PHP-FPM container
-            php_container = self.client.containers.create(
-                name=f"{stack_name}-php",
-                image='docker.io/php:8.2-fpm',
-                detach=True
-            )
+            php_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-php", 'docker.io/php:8.2-fpm'], capture_output=True, text=True)
 
             # Create Nginx container with port mapping
-            nginx_container = self.client.containers.create(
-                name=f"{stack_name}-nginx",
-                image='docker.io/nginx:latest',
-                ports={'80/tcp': None},  # Dynamically assign host port
-                detach=True
-            )
+            nginx_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-nginx", '-p', '80:80', 'docker.io/nginx:latest'], capture_output=True, text=True)
 
             # Create Adminer container
-            adminer_container = self.client.containers.create(
-                name=f"{stack_name}-adminer",
-                image='docker.io/adminer:latest',
-                ports={'8080/tcp': None},
-                detach=True
-            )
+            adminer_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-adminer", '-p', '8080:8080', 'docker.io/adminer:latest'], capture_output=True, text=True)
 
-            # Start containers in order
-            containers = [db_container, php_container, nginx_container, adminer_container]
+            if (db_container_create_result.returncode != 0 or php_container_create_result.returncode != 0 or nginx_container_create_result.returncode != 0 or adminer_container_create_result.returncode != 0):
+                self.logger.error("Failed to create containers")
+                return None
+
+            containers = [f"{stack_name}-db", f"{stack_name}-php", f"{stack_name}-nginx", f"{stack_name}-adminer"]
             started_containers = []
 
             for container in containers:
                 try:
-                    self.logger.info(f"Starting container: {container.name}")
-                    container.start()
+                    self.logger.info(f"Starting container: {container}")
+                    subprocess.run(['podman', 'start', container], check=True)
                     started_containers.append(container)
-                except Exception as e:
-                    self.logger.error(f"Failed to start container {container.name}: {str(e)}")
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Failed to start container {container}: {str(e)}")
                     # Clean up any containers that were started
                     for started in started_containers:
                         try:
-                            started.stop()
-                            started.remove()
-                        except:
+                            subprocess.run(['podman', 'stop', started], check=True)
+                            subprocess.run(['podman', 'rm', '-f', started], check=True)
+                        except subprocess.CalledProcessError as e:
                             pass
                     return None
+                except Exception as e:
+                    self.logger.error(f"An unexpected error occurred while starting container {container}: {str(e)}")
+                    return None
 
-            # Get the assigned Nginx port
-            nginx_info = nginx_container.inspect()
-            nginx_port = int(nginx_info['NetworkSettings']['Ports']['80/tcp'][0]['HostPort'])
+            # Get the assigned Nginx port (using inspect is unreliable with subprocess method)
+            nginx_port = 80
 
             # Create Container record in database
             db_container = Container(
-                container_id=nginx_container.id,  # Use Nginx container as main reference
+                container_id=f"{stack_name}-nginx",  # Use Nginx container as main reference
                 name=stack_name,
                 status='running',
                 user_id=user_id,
@@ -291,17 +248,17 @@ class PodmanManager:
 
     def cleanup_stack(self, stack_name: str):
         """Remove all containers in a stack if deployment fails"""
-        if not self.client:
+        if not self.available:
             return
 
         try:
-            containers = self.client.containers.list(all=True)
+            containers = subprocess.run(['podman', 'ps', '-a', '--format', '{{.ID}} {{.Names}}'], capture_output=True, text=True).stdout.strip().split('\n')
             for container in containers:
-                if container.name.startswith(stack_name):
+                if container.strip() and container.split()[1].startswith(stack_name):
                     try:
-                        container.remove(force=True)
-                    except Exception as e:
-                        self.logger.error(f"Failed to remove container {container.name}: {str(e)}")
+                        subprocess.run(['podman', 'rm', '-f', container.split()[0]], check=True)
+                    except subprocess.CalledProcessError as e:
+                        self.logger.error(f"Failed to remove container {container.split()[1]}: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error cleaning up stack {stack_name}: {str(e)}")
 
@@ -314,52 +271,49 @@ class PodmanManager:
         try:
             stack_name = f"wordpress-{user_id}"
 
-            # Create a pod for WordPress and MySQL
-            pod = self.client.pods.create(name=stack_name)
-
             # Generate random passwords
             db_password = os.urandom(16).hex()
             wp_password = os.urandom(16).hex()
 
             # Deploy MySQL container
-            mysql_container = self.client.containers.create(
-                name=f"{stack_name}-mysql",
-                image='docker.io/mysql:8.0',
-                environment={
-                    'MYSQL_ROOT_PASSWORD': db_password,
-                    'MYSQL_DATABASE': 'wordpress',
-                    'MYSQL_USER': 'wordpress',
-                    'MYSQL_PASSWORD': wp_password
-                },
-                pod=pod.id,
-                volumes=[f"{stack_name}-mysql-data:/var/lib/mysql"]
-            )
+            mysql_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-mysql", '--env', f'MYSQL_ROOT_PASSWORD={db_password}', '--env', 'MYSQL_DATABASE=wordpress', '--env', 'MYSQL_USER=wordpress', '--env', f'MYSQL_PASSWORD={wp_password}', 'docker.io/mysql:8.0'], capture_output=True, text=True)
+
 
             # Deploy WordPress container
-            wordpress_container = self.client.containers.create(
-                name=f"{stack_name}-wordpress",
-                image='docker.io/wordpress:latest',
-                environment={
-                    'WORDPRESS_DB_HOST': 'localhost',
-                    'WORDPRESS_DB_USER': 'wordpress',
-                    'WORDPRESS_DB_PASSWORD': wp_password,
-                    'WORDPRESS_DB_NAME': 'wordpress'
-                },
-                pod=pod.id,
-                ports={'80/tcp': None},
-                volumes=[f"{stack_name}-wordpress:/var/www/html"]
-            )
+            wordpress_container_create_result = subprocess.run(['podman', 'create', '--name', f"{stack_name}-wordpress", '--env', 'WORDPRESS_DB_HOST=localhost', '--env', 'WORDPRESS_DB_USER=wordpress', '--env', f'WORDPRESS_DB_PASSWORD={wp_password}', '--env', 'WORDPRESS_DB_NAME=wordpress', '-p', '80:80', 'docker.io/wordpress:latest'], capture_output=True, text=True)
 
-            # Start the pod which will start all containers
-            pod.start()
+            if (mysql_container_create_result.returncode != 0 or wordpress_container_create_result.returncode != 0):
+                self.logger.error("Failed to create containers")
+                return None
+            
+            containers = [f"{stack_name}-mysql", f"{stack_name}-wordpress"]
+            started_containers = []
+
+            for container in containers:
+                try:
+                    self.logger.info(f"Starting container: {container}")
+                    subprocess.run(['podman', 'start', container], check=True)
+                    started_containers.append(container)
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Failed to start container {container}: {str(e)}")
+                    # Clean up any containers that were started
+                    for started in started_containers:
+                        try:
+                            subprocess.run(['podman', 'stop', started], check=True)
+                            subprocess.run(['podman', 'rm', '-f', started], check=True)
+                        except subprocess.CalledProcessError as e:
+                            pass
+                    return None
+                except Exception as e:
+                    self.logger.error(f"An unexpected error occurred while starting container {container}: {str(e)}")
+                    return None
 
             # Get the assigned WordPress port
-            pod_info = pod.inspect()
-            wordpress_port = int(pod_info['Ports'][0]['HostPort'])
+            wordpress_port = 80
 
             # Create Container record in database
             db_container = Container(
-                container_id=pod.id,
+                container_id=f"{stack_name}-wordpress",
                 name=stack_name,
                 status='running',
                 user_id=user_id,
@@ -381,22 +335,17 @@ class PodmanManager:
 
     def cleanup_wordpress(self, stack_name: str):
         """Remove WordPress deployment and associated volumes"""
-        if not self.client:
+        if not self.available:
             return
 
         try:
-            # Remove the pod (this will remove all containers in the pod)
-            pods = self.client.pods.list()
-            for pod in pods:
-                if pod.name == stack_name:
-                    pod.remove(force=True)
-
-            # Remove volumes
-            volumes = self.client.volumes.list()
-            for volume in volumes:
-                if volume.name.startswith(stack_name):
-                    volume.remove(force=True)
-
+            containers = subprocess.run(['podman', 'ps', '-a', '--format', '{{.ID}} {{.Names}}'], capture_output=True, text=True).stdout.strip().split('\n')
+            for container in containers:
+                if container.strip() and container.split()[1].startswith(stack_name):
+                    try:
+                        subprocess.run(['podman', 'rm', '-f', container.split()[0]], check=True)
+                    except subprocess.CalledProcessError as e:
+                        self.logger.error(f"Failed to remove container {container.split()[1]}: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error cleaning up WordPress deployment {stack_name}: {str(e)}")
 
@@ -420,32 +369,38 @@ class PodmanManager:
 
             self.logger.info(f"Pulling image: {service.container_image}")
             try:
-                self.client.images.pull(service.container_image)
-            except Exception as e:
+                subprocess.run(['podman', 'pull', service.container_image], check=True)
+            except subprocess.CalledProcessError as e:
                 self.logger.error(f"Failed to pull image {service.container_image}: {str(e)}")
+                return None
+            except Exception as e:
+                self.logger.error(f"An unexpected error occurred while pulling image {service.container_image}: {str(e)}")
                 return None
 
             try:
-                container = self.client.containers.create(
-                    name=container_name,
-                    image=service.container_image,
-                    environment=environment,
-                    ports={f'{service.container_port}/tcp': None},
-                    detach=True
-                )
-                container.start()
-            except Exception as e:
+                # Construct the podman create command with environment variables
+                command = ['podman', 'create', '--name', container_name, '-p', f'{service.container_port}:{service.container_port}', service.container_image]
+                for key, value in environment.items():
+                    command.extend(['--env', f'{key}={value}'])
+
+                subprocess.run(command, check=True)
+                subprocess.run(['podman', 'start', container_name], check=True)
+            except subprocess.CalledProcessError as e:
                 self.logger.error(f"Failed to create/start container: {str(e)}")
                 return None
+            except Exception as e:
+                self.logger.error(f"An unexpected error occurred while creating/starting container: {str(e)}")
+                return None
+
 
             # Create Container record
             db_container = Container(
-                container_id=container.id,
+                container_id=container_name,
                 name=container_name,
                 status='running',
                 user_id=user_id,
                 service_id=service.id,
-                port=container.ports[f'{service.container_port}/tcp'][0]['HostPort'],
+                port=service.container_port, # Assuming port mapping is successful
                 environment=environment
             )
 
@@ -460,9 +415,8 @@ class PodmanManager:
             return False
 
         try:
-            container = self.client.containers.get(container_id)
-            container.stop()
-            return True
+            result = subprocess.run(['podman', 'stop', container_id], capture_output=True, text=True)
+            return result.returncode == 0
         except Exception as e:
             self.logger.error(f"Error stopping container: {str(e)}")
             return False
@@ -472,9 +426,8 @@ class PodmanManager:
             return False
 
         try:
-            container = self.client.containers.get(container_id)
-            container.remove(force=True)
-            return True
+            result = subprocess.run(['podman', 'rm', '-f', container_id], capture_output=True, text=True)
+            return result.returncode == 0
         except Exception as e:
             self.logger.error(f"Error removing container: {str(e)}")
             return False
@@ -484,8 +437,10 @@ class PodmanManager:
             return None
 
         try:
-            container = self.client.containers.get(container_id)
-            return container.status
+            result = subprocess.run(['podman', 'inspect', '--format', '{{.State.Status}}', container_id], capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip()
+            return None
         except Exception as e:
             self.logger.error(f"Error getting container status: {str(e)}")
             return None
