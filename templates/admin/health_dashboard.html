@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Server Health Dashboard - {{ super() }}{% endblock %}
+
+{% block styles %}
+<style>
+    .health-dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .status-card {
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        transition: var(--transition);
+    }
+
+    .status-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+    }
+
+    .status-healthy {
+        background-color: var(--success-color);
+    }
+
+    .status-warning {
+        background-color: var(--warning-color);
+    }
+
+    .status-error {
+        background-color: var(--danger-color);
+    }
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 600;
+        margin: 1rem 0;
+    }
+
+    .metric-label {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .chart-container {
+        height: 300px;
+        margin-top: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3">Server Health Dashboard</h1>
+        <span id="last-updated" class="text-muted"></span>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">CPU Usage</h5>
+                    <div class="display-4" id="cpu-usage">0%</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Memory Usage</h5>
+                    <div class="display-4" id="memory-usage">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateMetrics() {
+        fetch('/admin/health/status')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('cpu-usage').textContent = data.cpu + '%';
+                document.getElementById('memory-usage').textContent = data.memory + '%';
+                document.getElementById('last-updated').textContent = 
+                    'Last updated: ' + new Date().toLocaleTimeString();
+            })
+            .catch(error => console.error('Error fetching metrics:', error));
+    }
+
+    // Update metrics every 2 seconds
+    updateMetrics();
+    setInterval(updateMetrics, 2000);
+});
+</script>
+{% endblock %}

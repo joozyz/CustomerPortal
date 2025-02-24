@@ -257,12 +257,29 @@
                         </a>
                     </li>
                     {% if current_user.is_admin %}
-                        <li class="nav-item">
-                            <a href="{{ url_for('admin.settings') }}" class="nav-link">
-                                <i data-feather="shield"></i>
-                                <span>Admin</span>
-                            </a>
-                        </li>
+                        <div class="nav-section">
+                            <div class="nav-section-title">Admin</div>
+                            <ul class="nav-menu">
+                                <li class="nav-item">
+                                    <a href="{{ url_for('admin.admin_dashboard') }}" class="nav-link">
+                                        <i data-feather="layout"></i>
+                                        <span>Dashboard</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('health.dashboard') }}" class="nav-link">
+                                        <i data-feather="activity"></i>
+                                        <span>Health Monitor</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('admin.settings') }}" class="nav-link">
+                                        <i data-feather="settings"></i>
+                                        <span>Settings</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     {% endif %}
                     <li class="nav-item">
                         <a href="{{ url_for('auth.logout') }}" class="nav-link">
