@@ -89,19 +89,19 @@
                                     </td>
                                     <td>
                                         <div class="btn-group">
-                                            <form action="{{ url_for('service.create_backup', service_id=service.id) }}" method="POST" class="d-inline">
-                                                <button type="submit" class="btn btn-sm btn-success" {% if not service.backup_enabled %}disabled{% endif %}>
-                                                    <i data-feather="save" class="icon-sm me-1"></i> Backup Now
+                                            <form action="{{ url_for('service.deploy_service', service_id=service.id) }}" method="POST" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    <i data-feather="play" class="icon-sm me-1"></i> Deploy
                                                 </button>
                                             </form>
-                                            <a href="{{ url_for('service.list_backups', service_id=service.id) }}" class="btn btn-sm btn-info">
+                                            <form action="{{ url_for('service.create_backup', service_id=service.id) }}" method="POST" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-info" {% if not service.backup_enabled %}disabled{% endif %}>
+                                                    <i data-feather="save" class="icon-sm me-1"></i> Backup
+                                                </button>
+                                            </form>
+                                            <a href="{{ url_for('service.list_backups', service_id=service.id) }}" class="btn btn-sm btn-secondary">
                                                 <i data-feather="hard-drive" class="icon-sm me-1"></i> Manage Backups
                                             </a>
-                                            {% if service.domain %}
-                                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#domainModal{{ service.id }}">
-                                                <i data-feather="globe" class="icon-sm me-1"></i> Update Domain
-                                            </button>
-                                            {% endif %}
                                         </div>
 
                                         <!-- Domain Configuration Modal -->
@@ -116,10 +116,12 @@
                                                         <form action="{{ url_for('service.update_domain', service_id=service.id) }}" method="POST">
                                                             <div class="mb-3">
                                                                 <label for="domain" class="form-label">Domain Name</label>
-                                                                <input type="text" class="form-control" id="domain" name="domain" value="{{ service.domain }}" required>
+                                                                <input type="text" class="form-control" id="domain" name="domain" 
+                                                                       value="{{ service.domain }}" required>
                                                             </div>
                                                             <div class="mb-3 form-check">
-                                                                <input type="checkbox" class="form-check-input" id="enable_ssl" name="enable_ssl" {% if service.ssl_enabled %}checked{% endif %}>
+                                                                <input type="checkbox" class="form-check-input" id="enable_ssl" 
+                                                                       name="enable_ssl" {% if service.ssl_enabled %}checked{% endif %}>
                                                                 <label class="form-check-label" for="enable_ssl">Enable SSL</label>
                                                             </div>
                                                             <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -146,11 +148,31 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Feather icons
     feather.replace();
+
+    // Initialize service status polling
+    const updateServiceStatus = (serviceId) => {
+        fetch(`/services/${serviceId}/status`)
+            .then(response => response.json())
+            .then(data => {
+                const statusBadge = document.querySelector(`#service-status-${serviceId}`);
+                if (statusBadge) {
+                    statusBadge.className = `badge bg-${data.status === 'running' ? 'success' : 'warning'}`;
+                    statusBadge.textContent = data.status;
+                }
+            })
+            .catch(error => console.error('Error fetching service status:', error));
+    };
+
+    // Update status every 30 seconds
+    document.querySelectorAll('[id^="service-status-"]').forEach(badge => {
+        const serviceId = badge.id.split('-').pop();
+        setInterval(() => updateServiceStatus(serviceId), 30000);
+        updateServiceStatus(serviceId); // Initial update
+    });
 });
 </script>
 {% endblock %}
